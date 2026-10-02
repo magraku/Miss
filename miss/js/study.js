@@ -11,17 +11,54 @@ const INTERVALS = [0, 1, 3, 7, 14, 30]; // days per box
 const chunk = () => state.doc && state.doc.chunks?.[state.doc.current];
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-/* ---------- Flashcards ---------- */
+/* ---------- Flashcards (TCG-style with generated art) ---------- */
 const CARD_SCHEMA = {
   type: 'object',
-  properties: { cards: { type: 'array', items: { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' } }, required: ['front', 'back'] } } },
+  properties: { cards: { type: 'array', items: { type: 'object', properties: {
+    title: { type: 'string' }, front: { type: 'string' }, back: { type: 'string' }, img: { type: 'string' } },
+    required: ['front', 'back'] } } },
   required: ['cards'],
 };
 let queue = [];
 
+// Free, keyless, CORS-friendly image generation — one illustration per card.
+function cardImgUrl(c) {
+  if (!c.img) return null;
+  let seed = 0;
+  for (const ch of c.id || c.front) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(c.img + ', flat vector illustration, soft warm palette, no text')}?width=480&height=300&nologo=true&seed=${seed % 100000}`;
+}
+
+function tcgCard(c, { revealed = false } = {}) {
+  const img = cardImgUrl(c);
+  return `
+  <div class="tcg-card${revealed ? ' revealed' : ''}">
+    <div class="tcg-head"><span class="tcg-title">${esc(c.title || 'Concept')}</span><span class="tcg-box">Lv.${c.box}</span></div>
+    <div class="tcg-art">${img ? `<img src="${img}" alt="" loading="lazy" onerror="this.parentElement.classList.add('no-img')">` : ''}</div>
+    <div class="tcg-body">
+      <div class="side">${t('cards.question')}</div>
+      <p class="tcg-q">${esc(c.front)}</p>
+      <div class="tcg-ans${revealed ? '' : ' hidden'}"><div class="side">${t('cards.answer')}</div>${esc(c.back)}</div>
+    </div>
+  </div>`;
+}
+
+function renderDeckVisual() {
+  const v = $('deckVisual');
+  if (!v) return;
+  const cards = state.cards.slice(0, 6);
+  if (!cards.length) { v.innerHTML = ''; return; }
+  v.innerHTML = cards.map((c, i) => `
+    <div class="mini-card" style="--r:${(i - (cards.length - 1) / 2) * 5}deg; --y:${Math.abs(i - (cards.length - 1) / 2) * 4}px">
+      ${cardImgUrl(c) ? `<img src="${cardImgUrl(c)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      <span>${esc(c.title || '…')}</span>
+    </div>`).join('');
+}
+
 function buildQueue() {
   queue = shuffle(state.cards.filter(c => c.due <= Date.now()));
   renderCard();
+  renderDeckVisual();
 }
 
 function renderCard() {
@@ -32,12 +69,7 @@ function renderCard() {
   if (!state.cards.length) { stage.innerHTML = `<p class="empty-msg">${t('cards.none')}</p>`; return; }
   if (!queue.length) { stage.innerHTML = `<p class="empty-msg">${t('cards.allDone')}</p>`; return; }
   const c = queue[0];
-  stage.innerHTML = `
-    <div class="card">
-      <div class="side">${t('cards.question')}</div>
-      <div>${esc(c.front)}</div>
-      <div id="ans" hidden class="answer"><div class="side">${t('cards.answer')}</div>${esc(c.back)}</div>
-    </div>
+  stage.innerHTML = tcgCard(c) + `
     <div class="rate">
       <button id="reveal" class="pill-btn">${t('cards.reveal')}</button>
       <button class="pill-btn" data-r="again" hidden>${t('cards.again')}</button>
@@ -45,7 +77,8 @@ function renderCard() {
       <button class="pill-btn" data-r="easy" hidden>${t('cards.easy')}</button>
     </div>`;
   $('reveal').onclick = () => {
-    $('ans').hidden = false; $('reveal').hidden = true;
+    stage.querySelector('.tcg-ans')?.classList.remove('hidden');
+    $('reveal').hidden = true;
     stage.querySelectorAll('[data-r]').forEach(b => { b.hidden = false; });
     stage.querySelector('[data-r=good]')?.focus();
   };
@@ -76,7 +109,7 @@ export async function genCards({ automatic = false } = {}) {
     ], CARD_SCHEMA);
     const now = Date.now();
     const fresh = (data.cards || []).filter(c => c.front && c.back)
-      .map(c => ({ id: crypto.randomUUID(), front: c.front, back: c.back, box: 0, due: now, docId: d.id, section: d.current }));
+      .map(c => ({ id: crypto.randomUUID(), title: c.title || '', front: c.front, back: c.back, img: c.img || '', box: 0, due: now, docId: d.id, section: d.current }));
     if (!fresh.length) throw new Error(t('err.noCards'));
     state.cards.push(...fresh); save();
     buildQueue();

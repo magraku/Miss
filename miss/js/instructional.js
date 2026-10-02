@@ -24,7 +24,16 @@ analogy or simpler activity, then ask again. Never reveal an answer before the
 learner has tried.
 
 Tone: clear, conversational, patient, motivating, demanding. Reply entirely in
-English.`,
+English.
+
+EVALUATION LOOP (critical): after teaching a concept, check comprehension
+before allowing progress. Analyse the learner's answer by meaning, not literal
+match. If clear → confirm briefly and unlock the next step. If partial →
+identify exactly what's missing, re-explain only that gap with a different
+example or analogy, then ask a new question. If wrong → never punish, change
+approach entirely (analogy, counter-example, simpler activity), then ask again.
+A concept is mastered only when the answer demonstrates understanding — the
+number of attempts never matters.`,
 
 fr: `Tu es un concepteur pédagogique expert, professeur particulier et
 architecte d'expériences d'apprentissage interactives. Travaille uniquement
@@ -52,7 +61,17 @@ analogie ou une activité plus simple, puis repose la question. Ne révèle
 jamais une réponse avant que l'apprenant ait essayé.
 
 Ton : clair, conversationnel, patient, motivant et exigeant. Réponds
-entièrement en français.`,
+entièrement en français.
+
+BOUCLE D'ÉVALUATION (critique) : après chaque concept, vérifie la compréhension
+avant de laisser avancer. Analyse la réponse sur le sens, pas la forme. Si
+claire → confirme brièvement et débloque la suite. Si partielle → identifie
+exactement ce qui manque, réexplique uniquement cette lacune avec un autre
+exemple ou une analogie, puis pose une nouvelle question. Si fausse → jamais de
+reproche, change complètement d'approche (analogie, contre-exemple, activité
+plus simple), puis repose une question. Un concept n'est maîtrisé que quand la
+réponse démontre la compréhension — le nombre de tentatives n'a aucune
+importance.`,
 };
 
 export const FIRST_LESSON_REQUEST = {
@@ -76,15 +95,20 @@ résumé passif. Réponds en Markdown, avec concision :
 };
 
 export const CARDS_REQUEST = {
-en: `Create 5 to 8 study flashcards from this text. Each card has "front" (a
-question requiring recall or explanation — never yes/no) and "back" (a short,
-precise answer).
+en: `Create 5 to 8 study flashcards from this text, styled like collectible
+cards: each card is ONE key concept. Fields: "title" (2-4 word card name),
+"front" (a question requiring recall or explanation — never yes/no), "back"
+(short, precise answer), "img" (a 5-10 word English visual prompt describing an
+illustration of this concept — concrete scene or object, no text in image).
 
 TEXT:
 `,
-fr: `Crée 5 à 8 cartes de révision à partir de ce texte. Chaque carte a "front"
-(une question qui oblige à se souvenir ou expliquer — jamais de oui/non) et
-"back" (réponse courte et précise).
+fr: `Crée 5 à 8 cartes de révision à partir de ce texte, dans le style des
+cartes à collectionner : chaque carte = UN concept clé. Champs : "title" (nom
+de carte en 2-4 mots), "front" (question obligeant à se souvenir ou expliquer —
+jamais de oui/non), "back" (réponse courte et précise), "img" (prompt visuel en
+anglais de 5-10 mots décrivant une illustration du concept — scène ou objet
+concret, pas de texte dans l'image).
 
 TEXTE :
 `,
@@ -112,6 +136,30 @@ export const ASK_SUFFIX = {
 en: ' Answer using the CONTEXT only. If it does not contain the answer, say so clearly.\n\nCONTEXT:\n',
 fr: ' Réponds uniquement avec le CONTEXTE. S\'il ne contient pas la réponse, dis-le clairement.\n\nCONTEXTE :\n',
 };
+
+export const EVAL_REQUEST = {
+en: `Evaluate the learner's answer to the lesson's question. Judge the MEANING,
+not the wording. Reply as JSON: {"verdict": "mastered"|"partial"|"not",
+"feedback": "1-3 sentences: what was right, what to review if partial, or a new
+angle if not — always kind", "followup": "optional new question if verdict is
+not mastered"}`,
+fr: `Évalue la réponse de l'apprenant à la question de la leçon. Juge le SENS,
+pas la formulation. Réponds en JSON : {"verdict": "mastered"|"partial"|"not",
+"feedback": "1-3 phrases : ce qui était juste, quoi revoir si partiel, ou un
+nouvel angle si faux — toujours bienveillant", "followup": "nouvelle question
+optionnelle si le verdict n'est pas mastered"}`,
+};
+
+const EVAL_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['mastered', 'partial', 'not'] },
+    feedback: { type: 'string' },
+    followup: { type: 'string' },
+  },
+  required: ['verdict', 'feedback'],
+};
+export { EVAL_SCHEMA };
 
 // When related free APIs exist, append them so the model can weave real tools
 // into examples and practice activities.

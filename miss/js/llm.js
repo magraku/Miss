@@ -18,18 +18,39 @@ const listeners = new Set();
 export function onEngineChange(fn) { listeners.add(fn); fn(engineState); }
 function patch(p) { Object.assign(engineState, p); listeners.forEach(f => f(engineState)); }
 
-export function capabilities() {
+let _caps = null;
+export async function probeCapabilities() {
+  if (_caps) return _caps;
   const ua = navigator.userAgent;
   const mobile = /Mobi|Android|iPhone|iPad/i.test(ua) ||
     (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 820);
-  const webgpu = 'gpu' in navigator;
   const mem = navigator.deviceMemory || 8; // Chrome-only; assume OK elsewhere
-  const nano = 'LanguageModel' in self;
-  return {
-    webgpu, mem, mobile, nano,
-    canGenerate: (webgpu && !mobile) || nano,
+  // 'gpu' existing ≠ WebGPU usable: requestAdapter() returns null on
+  // unsupported hardware, VMs and remote desktops.
+  let webgpu = false, gpuReason = '';
+  if (!('gpu' in navigator)) { gpuReason = 'no-webgpu-api'; }
+  else {
+    try {
+      const adapter = await Promise.race([
+        navigator.gpu.requestAdapter(),
+        new Promise(r => setTimeout(() => r('timeout'), 4000)),
+      ]);
+      webgpu = !!adapter && adapter !== 'timeout';
+      if (!webgpu) gpuReason = 'no-adapter';
+    } catch (e) { gpuReason = 'adapter-error'; }
+  }
+  _caps = {
+    webgpu, mem, mobile, gpuReason,
+    nano: 'LanguageModel' in self,
     canDownloadModel: webgpu && !mobile,
   };
+  _caps.canGenerate = _caps.canDownloadModel || _caps.nano;
+  return _caps;
+}
+
+// Synchronous view for UI code that ran after probeCapabilities().
+export function capabilities() {
+  return _caps || { webgpu: false, mem: 8, mobile: false, nano: false, canGenerate: false, canDownloadModel: false, gpuReason: 'not-probed' };
 }
 
 /* ───────── Gemini Nano (Chrome Prompt API) ───────── */
@@ -112,7 +133,7 @@ async function webllmJSON(messages, schema) {
 // Starts whichever backend the device supports. Safe to call repeatedly.
 export async function connect() {
   if (engineState.status === 'ready' || engineState.status === 'loading' || engineState.status === 'downloading') return;
-  const caps = capabilities();
+  const caps = await probeCapabilities();
   try {
     if (await nanoAvailable()) {
       // Lazy: create() needs a user gesture when the model isn't downloaded yet,
@@ -130,10 +151,11 @@ export async function connect() {
       patch({ status: 'ready' });
       return;
     }
-    patch({ backend: null, status: 'unsupported', message: t('home.noWebgpu') });
+    patch({ backend: null, status: 'unsupported',
+            message: `${t('home.noWebgpu')} [${caps.gpuReason}${caps.mobile ? '+mobile' : ''}]` });
   } catch (e) {
     console.warn('engine init failed', e);
-    patch({ backend: null, status: 'error', message: e.message });
+    patch({ backend: null, status: 'error', message: `${t('home.reconnect')} — ${e.message}` });
   }
 }
 

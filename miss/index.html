@@ -111,6 +111,13 @@
         <div class="panel-content">
           <button id="genSummary" class="ghost-link regen-link" data-i18n="summary.regen">regenerate</button>
           <div id="summaryOut" class="prose"></div>
+          <div class="eval-box" id="evalBox" hidden>
+            <div id="evalFeedback" class="eval-feedback"></div>
+            <div class="eval-input-row">
+              <input id="evalInput" type="text" data-i18n-ph="eval.ph" placeholder="your answer, in your own words…" autocomplete="off">
+              <button class="pill-btn" id="evalBtn" data-i18n="eval.check">check</button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -152,9 +159,7 @@
         </div>
       </div>
 
-      <figure class="deck-cards-visual" aria-hidden="true">
-        <img src="./assets/v2/deck-cards.png" alt="">
-      </figure>
+      <div class="deck-visual" id="deckVisual" aria-hidden="true"></div>
     </section>
 
     <div class="deck-foot">

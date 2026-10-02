@@ -1,10 +1,11 @@
 // MissPedia — main controller. Views: home / library / study (Data Deck).
 import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse } from './store.js';
-import { connect, chatStream, engineState, onEngineChange, capabilities } from './llm.js';
+import { connect, chatStream, engineState, onEngineChange, probeCapabilities } from './llm.js';
 import { extractPdf, chunkPages, chunkPlain, retrieve, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
 import { t, setLang, applyI18n, lang } from './i18n.js';
-import { sys, FIRST_LESSON_REQUEST, ASK_SUFFIX, API_APPENDIX, docLang } from './instructional.js';
+import { sys, FIRST_LESSON_REQUEST, ASK_SUFFIX, API_APPENDIX, docLang, EVAL_REQUEST, EVAL_SCHEMA } from './instructional.js';
+import { chatJSON } from './llm.js';
 import { matchApis, searchApis, formatApisForContext } from './apilib.js';
 import { initAuth, signIn, signOut, auth, authEnabled, deleteRemote } from './sync.js';
 import { CONFIG } from './config.js';
@@ -12,7 +13,7 @@ import { initStudy, generateLearningTools } from './study.js';
 import { initTimer } from './timer.js';
 import { getCourse } from './db.js';
 
-const caps = capabilities();
+let caps = { canGenerate: false, mobile: false }; // filled by probeCapabilities() in boot
 let relatedApis = []; // APIs matched to the active document
 
 /* ── Stats ── */
@@ -312,10 +313,48 @@ async function genSummary({ automatic = false } = {}) {
     ])) { acc += t_; out.innerHTML = md(acc); }
     if (!acc.trim()) throw new Error(t('err.notJson'));
     state.doc.summaries[idx] = acc; save(); await persistDoc();
+    renderEvalBox();
     return acc;
   } catch (e) { toast(errMsg(e)); } finally { busy(genSummaryBtn, false); }
 }
 if (genSummaryBtn) genSummaryBtn.onclick = () => { void genSummary(); };
+
+/* ── Evaluator (Maria's loop: no progress without comprehension) ── */
+function renderEvalBox() {
+  const box = $('evalBox');
+  if (!box) return;
+  const hasLesson = !!(state.doc && state.doc.summaries[state.doc.current]);
+  box.hidden = !(hasLesson && engineState.status === 'ready');
+  $('evalFeedback').innerHTML = '';
+  $('evalInput').value = '';
+}
+bus.addEventListener('doc', renderEvalBox);
+onEngineChange(renderEvalBox);
+
+async function evaluateAnswer() {
+  const d = state.doc;
+  const answer = $('evalInput').value.trim();
+  const ch = chunk();
+  if (!answer || !ch) return;
+  const btn = $('evalBtn'); busy(btn, true, t('eval.thinking'));
+  try {
+    const r = await chatJSON([
+      { role: 'system', content: sys(d) },
+      { role: 'user', content: `${EVAL_REQUEST[docLang(d)]}\n\nLESSON MATERIAL:\n${ch.text}\n\nLESSON:\n${d.summaries[d.current]}\n\nLEARNER ANSWER:\n${answer}` },
+    ], EVAL_SCHEMA);
+    const fb = $('evalFeedback');
+    const cls = r.verdict === 'mastered' ? 'eval-good' : r.verdict === 'partial' ? 'eval-mid' : 'eval-bad';
+    fb.innerHTML = `<div class="eval-msg ${cls}">${md(r.feedback)}${r.followup ? `<p class="eval-follow">${esc(r.followup)}</p>` : ''}</div>`;
+    if (r.verdict === 'mastered') {
+      addXP(8);
+      fb.innerHTML += `<p class="eval-mastered">${t('eval.mastered')}</p>`;
+      $('evalInput').value = '';
+      if (!d.done.includes(d.current)) { /* mark progress softly */ }
+    }
+  } catch (e) { toast(errMsg(e)); } finally { busy(btn, false); }
+}
+$('evalBtn').onclick = evaluateAnswer;
+$('evalInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); void evaluateAnswer(); } });
 
 // Auto-generate lesson when entering a section that has none.
 async function maybeGenerateForSection() {
@@ -403,6 +442,7 @@ async function boot() {
   renderDoc();
   showView(state.doc ? 'study' : 'home');
   await initAuth();
+  caps = await probeCapabilities();
   void connect();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 }
