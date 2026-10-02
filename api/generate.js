@@ -4,10 +4,17 @@
 //
 // Configure in Vercel → Project → Environment Variables:
 //   AI_API_KEY = gsk_…        (console.groq.com, free)
-//   AI_MODEL   = llama-3.3-70b-versatile  (optional override)
+//   AI_MODEL   = qwen/qwen3.8-27b  (optional override)
 
 const UPSTREAM = process.env.AI_BASE_URL || 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
+// Groq rotates its free-tier lineup — try in order until one answers.
+const MODELS = [...new Set([
+  process.env.AI_MODEL,
+  'qwen/qwen3.8-27b',
+  'qwen/qwen3.6-27b',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+].filter(Boolean))];
 const MAX_BODY = 120 * 1024;         // ~120KB of prompt is already generous
 const MAX_TOKENS = 2048;
 
@@ -40,25 +47,26 @@ module.exports = async function handler(req, res) {
     .filter(m => m && typeof m.content === 'string')
     .map(m => ({ role: ['system', 'user', 'assistant'].includes(m.role) ? m.role : 'user', content: m.content }));
 
-  const payload = {
-    model: MODEL,
-    messages,
-    temperature: body.temperature ?? 0.4,
-    max_tokens: Math.min(body.max_tokens ?? MAX_TOKENS, MAX_TOKENS),
-    stream: true,
-  };
-  if (body.json) payload.response_format = { type: 'json_object' };
-
   try {
-    const up = await fetch(UPSTREAM, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!up.ok) {
-      const txt = await up.text().catch(() => '');
-      return res.status(up.status).json({ error: `upstream ${up.status}`, detail: txt.slice(0, 300) });
+    let up = null, txt = '';
+    for (const model of MODELS) {
+      up = await fetch(UPSTREAM, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model, messages,
+          temperature: body.temperature ?? 0.4,
+          max_tokens: Math.min(body.max_tokens ?? MAX_TOKENS, MAX_TOKENS),
+          stream: true,
+          ...(body.json ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+      if (up.ok) break;
+      txt = await up.text().catch(() => '');
+      const modelGone = up.status === 404 || /model_not_found|decommissioned/i.test(txt);
+      if (!modelGone) return res.status(up.status).json({ error: `upstream ${up.status}`, detail: txt.slice(0, 300) });
     }
+    if (!up || !up.ok) return res.status(502).json({ error: 'no free model available', detail: txt.slice(0, 300) });
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Accel-Buffering', 'no');
