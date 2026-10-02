@@ -1,6 +1,6 @@
 // MissPedia — main controller. Views: home / library / study (Data Deck).
 import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse } from './store.js';
-import { connect, chatStream, engineState, onEngineChange, probeCapabilities } from './llm.js';
+import { connect, chatStream, engineState, onEngineChange, probeCapabilities, whenEngineReady } from './llm.js';
 import { extractPdf, chunkPages, chunkPlain, retrieve, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
 import { t, setLang, applyI18n, lang } from './i18n.js';
@@ -364,6 +364,15 @@ async function maybeGenerateForSection() {
 }
 
 /* ── Ready → study ── */
+const genOverlay = $('genOverlay'), genHint = $('genHint'), genBack = $('genBack');
+function showGenOverlay(on, errMsg_) {
+  genOverlay.hidden = !on;
+  genBack.hidden = !errMsg_;
+  if (errMsg_) genHint.textContent = errMsg_;
+  else genHint.textContent = t('gen.hint');
+}
+genBack.onclick = () => { showGenOverlay(false); showView('home'); };
+
 $('readyBtn').onclick = () => {
   if (!state.doc) return;
   showView('study');
@@ -376,13 +385,25 @@ $('readyBtn').onclick = () => {
 let learningLaunch = 0;
 async function launchLearningExperience() {
   const launch = ++learningLaunch;
-  toast(t('toast.preparing'));
-  const results = await Promise.allSettled([
-    genSummary({ automatic: true }),
-    generateLearningTools(),
-  ]);
-  if (launch !== learningLaunch) return;
-  if (results.some(r => r.status === 'fulfilled')) toast(t('toast.ready'));
+  showGenOverlay(true);
+  try {
+    // Gate on the engine: the course must not appear before AI is up.
+    if (engineState.status !== 'ready') {
+      void connect(); // start/resume if idle
+      await whenEngineReady();
+    }
+    const results = await Promise.allSettled([
+      genSummary({ automatic: true }),
+      generateLearningTools(),
+    ]);
+    if (launch !== learningLaunch) return;
+    showGenOverlay(false);
+    if (results.some(r => r.status === 'fulfilled')) toast(t('toast.ready'));
+    else toast(t('err.ollama'));
+  } catch (e) {
+    if (launch !== learningLaunch) return;
+    showGenOverlay(true, errMsg(e));
+  }
 }
 
 $('backBtn').onclick = () => showView('library');

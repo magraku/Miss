@@ -110,12 +110,18 @@ function killWebllm() {
 
 function webllmInit(onProgress) {
   return new Promise((resolve, reject) => {
-    let lastTick = Date.now();
+    let lastTick = Date.now(), lastP = 0;
     const watchdog = setInterval(() => {
-      if (Date.now() - lastTick > STALL_MS) reject(new Error('download stalled — check your connection'));
+      // After ~100% the engine compiles weights — no more progress events for
+      // a while on slow machines, so allow a much longer stall then.
+      const limit = lastP >= 0.99 ? 180000 : STALL_MS;
+      if (Date.now() - lastTick > limit) reject(new Error('download stalled — check your connection'));
     }, 5000);
     webllm.CreateWebWorkerMLCEngine(worker, modelId, {
-      initProgressCallback: r => { lastTick = Date.now(); onProgress?.(r.progress, r.text); },
+      // Cache API fails on multi-GB downloads in Chrome ("Cache.add() network
+      // error"); IndexedDB storage is far more reliable for big models.
+      useIndexedDBCache: true,
+      initProgressCallback: r => { lastTick = Date.now(); lastP = r.progress ?? lastP; onProgress?.(r.progress, r.text); },
     }).then(resolve, reject).finally(() => clearInterval(watchdog));
   });
 }
@@ -288,3 +294,18 @@ export async function chatJSON(messages, schema, retries = 2) {
 }
 
 export function currentModel() { return engineState.model; }
+
+// Resolves when the engine is ready (waits through download/loading),
+// rejects on 'unsupported'/'error'. Used to gate the "ready" flow.
+export function whenEngineReady() {
+  return new Promise((resolve, reject) => {
+    if (engineState.status === 'ready') return resolve();
+    if (engineState.status === 'error' || engineState.status === 'unsupported')
+      return reject(new Error(engineState.message || 'engine unavailable'));
+    const fn = s => {
+      if (s.status === 'ready') { listeners.delete(fn); resolve(); }
+      if (s.status === 'error' || s.status === 'unsupported') { listeners.delete(fn); reject(new Error(s.message || 'engine unavailable')); }
+    };
+    listeners.add(fn);
+  });
+}
