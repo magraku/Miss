@@ -3,7 +3,7 @@ export const CONFIG = {
   // Supabase (Settings → API in your dashboard). The anon key is safe to expose:
   // row-level security protects every row. Leave empty to run without accounts.
   SUPABASE_URL: 'https://aamdgwttwbtzafamphfh.supabase.co',
-  SUPABASE_ANON_KEY: '', // ← paste "anon public" key here
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhbWRnd3R0d2J0emFmYW1waGZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NDUzNzEsImV4cCI6MjEwNjUyMTM3MX0.lPPtoyuhtYcRl3sTBUdpPoGZYY-t0AYaisF0y_SwHt8',
 
   // Donation link shown in the header (wired later).
   DONATE_URL: '',
