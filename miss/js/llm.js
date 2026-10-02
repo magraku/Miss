@@ -43,8 +43,9 @@ export async function probeCapabilities() {
     webgpu, mem, mobile, gpuReason,
     nano: 'LanguageModel' in self,
     canDownloadModel: webgpu && !mobile,
+    cloudFallback: !mobile, // desktop CPU-only machines fall back to the free proxy
   };
-  _caps.canGenerate = _caps.canDownloadModel || _caps.nano;
+  _caps.canGenerate = !mobile && (_caps.canDownloadModel || _caps.nano || _caps.cloudFallback);
   return _caps;
 }
 
@@ -151,11 +152,56 @@ export async function connect() {
       patch({ status: 'ready' });
       return;
     }
+    if (caps.cloudFallback) {
+      // Desktop without WebGPU and without Nano → free cloud proxy.
+      try {
+        const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        // 400 means the function exists but rejected our probe — good enough.
+        // 404 = no function (local static server), 503 = AI_API_KEY missing.
+        if (r.status === 404 || r.status === 503) throw new Error('no-cloud');
+        patch({ backend: 'cloud', status: 'ready', model: 'Cloud (free)' });
+        return;
+      } catch {
+        patch({ backend: null, status: 'unsupported',
+                message: `${t('home.noWebgpu')} [${caps.gpuReason}+no-cloud]` });
+        return;
+      }
+    }
     patch({ backend: null, status: 'unsupported',
             message: `${t('home.noWebgpu')} [${caps.gpuReason}${caps.mobile ? '+mobile' : ''}]` });
   } catch (e) {
     console.warn('engine init failed', e);
     patch({ backend: null, status: 'error', message: `${t('home.reconnect')} — ${e.message}` });
+  }
+}
+
+/* ───────── Cloud fallback (Vercel function → Groq free tier) ───────── */
+async function cloudFetch(messages, json = false) {
+  const res = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, json }),
+  });
+  if (!res.ok) throw new Error(`cloud ${res.status}`);
+  return res;
+}
+
+async function* sseTokens(res) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n'); buf = lines.pop();
+    for (const ln of lines) {
+      const l = ln.trim();
+      if (!l.startsWith('data:')) continue;
+      const data = l.slice(5).trim();
+      if (data === '[DONE]') return;
+      try { const d = JSON.parse(data)?.choices?.[0]?.delta?.content; if (d) yield d; } catch { /* partial */ }
+    }
   }
 }
 
@@ -165,7 +211,10 @@ function needReady() {
 
 export async function* chatStream(messages) {
   needReady();
-  yield* (engineState.backend === 'nano' ? nanoStream(messages) : webllmStream(messages));
+  const b = engineState.backend;
+  if (b === 'nano') yield* nanoStream(messages);
+  else if (b === 'cloud') yield* sseTokens(await cloudFetch(messages));
+  else yield* webllmStream(messages);
 }
 
 export async function chatJSON(messages, schema, retries = 2) {
@@ -177,6 +226,9 @@ export async function chatJSON(messages, schema, retries = 2) {
       if (engineState.backend === 'nano') {
         const s = await nanoEnsure();
         raw = await s.prompt(nanoPrompt(messages), { responseConstraint: schema });
+      } else if (engineState.backend === 'cloud') {
+        raw = '';
+        for await (const d of sseTokens(await cloudFetch(messages, true))) raw += d;
       } else {
         raw = await webllmJSON(messages, schema);
       }

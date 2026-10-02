@@ -5,9 +5,10 @@ on-device AI turns it into a course: lessons, flashcards, quizzes — in English
 or French. Sign in with a magic link to sync courses across devices (generate
 on desktop, review on your phone).
 
-- **No server, no account required.** The AI runs on your machine via
-  [WebLLM](https://github.com/mlc-ai/web-llm) (WebGPU) — or Gemini Nano when
-  your browser ships it. Course bodies live in IndexedDB.
+- **No server, no account required.** The AI picks the best engine your
+  device supports — Gemini Nano (recent Chrome), WebLLM in a WebGPU worker,
+  or a free cloud proxy (`api/generate.js` → Groq free tier) for CPU-only
+  desktops. Mobile = review mode only.
 - **Free public APIs** from the [public-apis](https://github.com/public-apis/public-apis)
   catalog are matched to your document's subject and woven into lessons and
   answers.
@@ -48,8 +49,18 @@ Supabase setup: run `supabase/schema.sql` in the SQL editor, enable Email OTP
 
 ## Deploy (Vercel)
 
-The app is fully static — deploy the folder as-is (`vercel deploy`, no build
-command, no env vars needed; the anon key is public by design and protected by RLS).
+Static site + one serverless function. Deploy the folder as-is (`vercel deploy`
+or import the repo with Root Directory = `miss/`).
+
+Cloud fallback env vars (optional — without them CPU-only desktops show the
+"no generation" banner):
+
+| Var | Value |
+|---|---|
+| `AI_API_KEY` | `gsk_…` from console.groq.com (free) |
+| `AI_MODEL` | optional, default `llama-3.3-70b-versatile` |
+
+The Supabase anon key stays public by design (RLS protects rows).
 
 ## Structure
 
