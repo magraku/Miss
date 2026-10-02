@@ -1,92 +1,75 @@
-# Sosiego · estudia con calma
+# MissPedia · learn calmly
 
-Una app de estudio que corre **en tu computadora** con [Gemma](https://ai.google.dev/gemma) a través de [Ollama](https://ollama.com). Lee tus PDFs, los divide en secciones y te ayuda a aprender de forma progresiva:
+A study app that runs **in your browser**. Drop a PDF (or paste notes), and an
+on-device AI turns it into a course: lessons, flashcards, quizzes — in English
+or French. Sign in with a magic link to sync courses across devices (generate
+on desktop, review on your phone).
 
-- **Resumen** de cada sección con ejemplos cotidianos.
-- **Tarjetas de repaso** con repetición espaciada (cajas de Leitner).
-- **Quiz** de 5 preguntas por sección; al superarlo (60 %) la sección queda "dominada".
-- **Preguntar** a tu material: busca los fragmentos relevantes y Gemma responde con ellos.
-- **Temporizador de concentración** (25/30/45/50 min) que te pide una intención al empezar y te pregunta si la lograste al terminar.
-- **Racha y XP** para mantener el hábito.
-- Diseño de contraste moderado, colores apagados y tema claro/oscuro para no cansar la vista.
+- **No server, no account required.** The AI runs on your machine via
+  [WebLLM](https://github.com/mlc-ai/web-llm) (WebGPU) — or Gemini Nano when
+  your browser ships it. Course bodies live in IndexedDB.
+- **Free public APIs** from the [public-apis](https://github.com/public-apis/public-apis)
+  catalog are matched to your document's subject and woven into lessons and
+  answers.
+- **Focus timer** (25/30/45/50 min), streaks and XP.
+- **Supabase** magic-link sync (optional): see `supabase/schema.sql`.
 
-Todo se guarda en el `localStorage` de tu navegador. No hay servidor ni cuentas.
+## Requirements
 
-## Requisitos
+- A desktop browser with **WebGPU** (Chrome/Edge 113+, Safari 26+, Firefox 141+).
+- First load downloads the AI model (~1–3 GB once, cached afterwards — the app
+  then works offline).
+- Internet on first load (fonts, pdf.js, model). On mobile the app opens in
+  review mode: flashcards, quizzes and lessons sync'd from your desktop.
 
-1. [Ollama](https://ollama.com/download) instalado y abierto.
-2. Un modelo Gemma:
-   ```bash
-   ollama pull gemma3:4b
-   ```
-   Si tu compu tiene poca RAM usa `gemma3:1b`; si tiene bastante, `gemma3:12b` da mejores resultados.
-3. Un navegador moderno (Chrome, Edge, Firefox, Safari).
-4. Internet la primera vez, para cargar la tipografía y pdf.js desde una CDN.
+## Run
 
-## Cómo ejecutarlo
-
-No hay paso de compilación. Desde esta carpeta:
-
-```bash
-python -m http.server 8000
-```
-
-y abre <http://localhost:8000>. (También sirve `npx serve`.) No abras `index.html` con doble clic: los módulos JS necesitan un servidor.
-
-Arriba a la derecha verás un punto verde cuando Ollama esté conectado. Si está rojo, abre Ollama y pulsa **Reconectar**.
-
-## Estructura
-
-```
-index.html        interfaz
-css/styles.css    diseño y temas
-js/app.js         pestañas, documento, resumen, preguntar
-js/timer.js       temporizador de concentración
-js/study.js       tarjetas y quiz
-js/llm.js         cliente de Ollama (chat en streaming y JSON estructurado)
-js/docs.js        lectura de PDF, secciones y búsqueda de fragmentos
-js/store.js       progreso guardado en localStorage
-js/util.js        utilidades (markdown seguro, avisos)
-```
-
-## Subirlo a GitHub
+No build step. From this folder:
 
 ```bash
-git init
-git add .
-git commit -m "Primera versión de Sosiego"
-git branch -M main
-git remote add origin https://github.com/TU_USUARIO/sosiego.git
-git push -u origin main
+npx serve .
+# or: python -m http.server 8000
 ```
 
-### Que otras personas lo usen
+Open the printed URL — do not double-click `index.html` (ES modules need a server).
 
-Cada persona necesita **su propio Ollama con Gemma** (la IA corre en su computadora, no en la tuya). Lo más simple es que clonen el repo y sigan los pasos de arriba.
+## Configure
 
-Si quieres publicarlo con GitHub Pages, el navegador de quien lo abra intentará conectarse a *su* Ollama local, y Ollama debe permitir ese origen:
+`js/config.js`:
 
-```bash
-# macOS / Linux
-OLLAMA_ORIGINS="https://TU_USUARIO.github.io" ollama serve
+| Key | Purpose |
+|---|---|
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | project URL + **publishable** key. Empty = local-only mode. |
+| `DONATE_URL` | donation link in the header |
+| `MODELS_DESKTOP` / `MODELS_LIGHT` | model preference order (auto-picked vs `deviceMemory`) |
+
+Supabase setup: run `supabase/schema.sql` in the SQL editor, enable Email OTP
+(Authentication → Providers), add your site URL to Auth → URL Configuration.
+
+## Deploy (Vercel)
+
+The app is fully static — deploy the folder as-is (`vercel deploy`, no build
+command, no env vars needed; the anon key is public by design and protected by RLS).
+
+## Structure
+
+```
+index.html          views: home / library / data-deck
+css/styles.css      light editorial theme
+js/app.js           views, file intake, lessons, ask
+js/llm.js           AI adapter: Gemini Nano → WebLLM worker
+js/worker.js        WebLLM web worker host
+js/study.js         flashcards (Leitner) + quiz
+js/timer.js         focus timer
+js/docs.js          pdf.js v4, sectioning, FR/EN TF-IDF retrieval
+js/apilib.js        public-apis catalog matching + search
+js/store.js         localStorage state; bodies in IndexedDB (db.js)
+js/sync.js          Supabase auth + course sync
+js/i18n.js          EN/FR strings
+js/instructional.js bilingual pedagogical prompts
+data/apis.json      1 966 free APIs (parsed from public-apis)
 ```
 
-En Windows define la variable de entorno `OLLAMA_ORIGINS` y reinicia Ollama. Algunos navegadores piden permiso para conectar con `localhost` desde una página https.
-
-## Limitaciones actuales
-
-- Los PDFs escaneados (solo imagen) no se pueden leer todavía; Gemma 3 entiende imágenes y se podría añadir lectura por página.
-- La búsqueda dentro del documento usa coincidencia de palabras (TF-IDF), no embeddings.
-- No busca en internet: un navegador no puede consultar buscadores directamente (CORS), así que necesita un pequeño servidor intermedio.
-
-## Próximos pasos
-
-1. Detector de somnolencia con cámara (MediaPipe, todo en el navegador).
-2. Búsqueda web para traer ejemplos extra (mini-servidor local con Tavily o DuckDuckGo).
-3. Modo Feynman: explicas el concepto con tus palabras y Gemma te corrige.
-4. Mapa de progreso por tema y más retos.
-5. Instalable como PWA.
-
-## Licencia
+## License
 
 MIT

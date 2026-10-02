@@ -1,186 +1,233 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Miss · aprende</title>
+  <title>MissPedia · learn calmly</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./css/styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js"></script>
 </head>
-<body data-phase="idle" data-view="home">
+<body data-phase="idle">
 
-<!-- ═══ VISTA HOME ═══ -->
+<!-- ═══ TOP BAR ═══ -->
+<nav class="topbar">
+  <a class="brand" href="#" id="brandHome">MissPedia</a>
+  <div class="topbar-actions">
+    <button class="ghost-link" id="navLibrary" data-i18n="nav.library">my courses</button>
+    <a class="ghost-link" id="navDonate" data-i18n="nav.donate" target="_blank" rel="noopener">donate</a>
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button data-lang="en">EN</button><button data-lang="fr">FR</button>
+    </div>
+    <button class="ghost-link" id="navAuth" data-i18n="nav.signin">sign in</button>
+  </div>
+</nav>
+
+<!-- ═══ VIEW: HOME ═══ -->
 <div class="view view-home" id="view-home">
-
   <div class="home-backdrop" aria-hidden="true">
-    <img src="./assets/figma/home-squiggle-left.svg" class="home-squiggle home-squiggle-left" alt="">
-    <img src="./assets/figma/home-squiggle-right.svg" class="home-squiggle home-squiggle-right" alt="">
+    <img src="./assets/v2/squiggle-left.svg" class="home-squiggle home-squiggle-left" alt="">
+    <img src="./assets/v2/squiggle-right.svg" class="home-squiggle home-squiggle-right" alt="">
   </div>
 
   <header class="home-header">
-    <p class="tagline">What are we learning today?</p>
+    <p class="tagline" data-i18n="app.tagline">What are we learning today?</p>
   </header>
 
-  <!-- Círculo grande: drop zone -->
   <div class="drop-ring-wrap">
     <div class="drop-ring" id="dropRing">
-      <img class="liquid-surface" src="./assets/figma/home-background.png" alt="">
-      <input id="file" type="file" accept="application/pdf,.txt,.md" aria-label="Sube tu material">
+      <img class="liquid-surface" src="./assets/v2/liquid-circle.png" alt="">
+      <input id="file" type="file" accept="application/pdf,.txt,.md" aria-label="Upload your material">
       <div class="drop-inner">
-        <span class="drop-label" id="dropLabel">put your files here.</span>
-        <span class="drop-hint" id="dropHint">pdf · txt · md</span>
+        <span class="drop-label" id="dropLabel" data-i18n="home.drop">put your files here.</span>
+        <span class="drop-hint" id="dropHint" data-i18n="home.dropHint">pdf · txt · md</span>
       </div>
     </div>
   </div>
 
-  <!-- Texto pegado -->
   <div class="paste-toggle-wrap">
-    <button class="ghost-link" id="togglePaste">or paste text instead</button>
+    <button class="ghost-link" id="togglePaste" data-i18n="home.paste">or paste text instead</button>
     <div class="paste-box" id="pasteBox" hidden>
-      <textarea id="paste" rows="4" placeholder="paste your notes here…"></textarea>
-      <button class="pill-btn" id="usePaste">use this text</button>
+      <textarea id="paste" rows="4" data-i18n-ph="home.pastePh" placeholder="paste your notes here…"></textarea>
+      <button class="pill-btn" id="usePaste" data-i18n="home.usePaste">use this text</button>
     </div>
   </div>
 
-  <!-- Círculo pequeño: ready -->
   <div class="ready-ring-wrap">
     <button class="ready-ring" id="readyBtn" disabled>
-      <img class="ready-liquid" src="./assets/figma/home-liquid.png" alt="">
-      <span>ready!</span>
+      <img class="ready-liquid" src="./assets/v2/ready-dot.svg" alt="">
+      <span data-i18n="home.ready">ready!</span>
     </button>
-    <div class="model-status">
-      <span id="status" class="dot" title="Ollama status"></span>
-      <select id="model" aria-label="Ollama model"></select>
-      <button id="reconnect" class="ghost-link" hidden>reconnect</button>
-    </div>
+  </div>
+
+  <!-- Engine status: download progress / capability notice -->
+  <div class="engine-status" id="engineStatus">
+    <div class="engine-bar" id="engineBar" hidden><span id="engineFill"></span></div>
+    <p class="engine-msg" id="engineMsg"></p>
+    <button class="ghost-link" id="engineRetry" data-i18n="home.reconnect" hidden>retry</button>
   </div>
 
   <p id="docStatus" class="status-msg" aria-live="polite"></p>
 </div>
 
-<!-- ═══ VISTA DATA DECK ═══ -->
+<!-- ═══ VIEW: LIBRARY ═══ -->
+<div class="view view-library" id="view-library" hidden>
+  <div class="home-backdrop" aria-hidden="true">
+    <img src="./assets/v2/squiggle-left.svg" class="home-squiggle home-squiggle-left" alt="">
+    <img src="./assets/v2/squiggle-right.svg" class="home-squiggle home-squiggle-right" alt="">
+  </div>
+  <header class="lib-head">
+    <h1 class="tagline" data-i18n="lib.title">Your courses</h1>
+    <p id="libBanner" class="lib-banner" hidden></p>
+  </header>
+  <div class="lib-grid" id="libGrid"></div>
+</div>
+
+<!-- ═══ VIEW: DATA DECK (study) ═══ -->
 <div class="view view-study" id="view-study" hidden>
+  <img src="./assets/v2/deck-squiggle-1.png" class="deck-squiggle deck-sq-tl" alt="" aria-hidden="true">
+  <img src="./assets/v2/deck-squiggle-2.png" class="deck-squiggle deck-sq-br" alt="" aria-hidden="true">
+
   <header class="study-bar">
-    <button class="back-btn" id="backBtn">← Miss</button>
+    <button class="back-btn" id="backBtn" data-i18n="study.back">← MissPedia</button>
     <div class="study-meta">
       <span id="docName" class="doc-name"></span>
-      <span id="streak">0 días</span>
-      <span id="xp">0 XP</span>
-    </div>
-    <div class="study-model">
-      <span id="status2" class="dot"></span>
-      <select id="model2" aria-label="Modelo"></select>
+      <span id="streak"></span>
+      <span id="xp"></span>
+      <span id="syncState" class="sync-state"></span>
     </div>
   </header>
 
-  <main class="study-layout deck-layout">
-    <img src="./assets/figma/deck-squiggle-left.svg" class="deck-squiggle deck-squiggle-left" alt="">
-    <img src="./assets/figma/deck-squiggle-right.svg" class="deck-squiggle deck-squiggle-right" alt="">
-
-    <div class="deck-brand" aria-label="Data Deck">
-      <img src="./assets/figma/deck-logo.png" alt="">
-      <h1>Data Deck</h1>
+  <main class="study-layout">
+    <div class="deck-left">
+      <div class="deck-blob">
+        <img src="./assets/v2/deck-blob.png" alt="">
+        <h1>Data Deck</h1>
+      </div>
+      <section class="deck-textpanel" id="panel-summary" role="tabpanel">
+      <img src="./assets/v2/deck-textpanel.png" class="panel-bg" alt="" aria-hidden="true">
+        <div class="panel-content">
+          <button id="genSummary" class="ghost-link regen-link" data-i18n="summary.regen">regenerate</button>
+          <div id="summaryOut" class="prose"></div>
+        </div>
+      </section>
     </div>
 
-    <aside class="focus-panel deck-legacy" aria-hidden="true">
-      <div class="ring" role="timer" aria-live="off">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="track" cx="60" cy="60" r="54"/>
-          <circle id="arc" class="arc" cx="60" cy="60" r="54" transform="rotate(-90 60 60)"/>
-        </svg>
-        <div class="ring-text">
-          <span id="time">30:00</span>
-          <span id="phase">concentración</span>
-        </div>
-      </div>
-
-      <div class="timer-controls">
-        <button id="start" class="pill-btn">comenzar</button>
-        <button id="reset" class="ghost-link">reiniciar</button>
-      </div>
-
-      <label for="intention" class="intention-label">¿qué vas a lograr?</label>
-      <input id="intention" type="text" maxlength="120" placeholder="ej. entender la sección 2…" class="intention-input">
-
-      <select id="focusMin" class="focus-select">
-        <option value="25">25 min</option>
-        <option value="30" selected>30 min</option>
-        <option value="45">45 min</option>
-        <option value="50">50 min</option>
-      </select>
-      <p id="cycles" class="hint-sm">bloques hoy: 0</p>
-
-      <!-- Secciones del doc -->
-      <div class="sections-wrap">
-        <div class="sectionbar">
-          <button id="prevLegacy" class="ghost-link" aria-label="Anterior">‹</button>
-          <div id="sectionLabel" class="section-label">sin material</div>
-          <button id="nextLegacy" class="ghost-link" aria-label="Siguiente">›</button>
-        </div>
-        <ol id="sections" class="sections"></ol>
-      </div>
-    </aside>
-
-    <section class="workspace deck-workspace">
+    <section class="deck-right">
       <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="summary" aria-selected="true">lección</button>
-        <button role="tab" data-tab="cards" aria-selected="false" tabindex="-1">práctica</button>
-        <button role="tab" data-tab="quiz" aria-selected="false" tabindex="-1">reto</button>
-        <button role="tab" data-tab="ask" aria-selected="false" tabindex="-1">preguntar</button>
+        <button role="tab" data-tab="summary" aria-selected="true" data-i18n="tab.summary">lesson</button>
+        <button role="tab" data-tab="cards" aria-selected="false" tabindex="-1" data-i18n="tab.cards">practice</button>
+        <button role="tab" data-tab="quiz" aria-selected="false" tabindex="-1" data-i18n="tab.quiz">challenge</button>
+        <button role="tab" data-tab="ask" aria-selected="false" tabindex="-1" data-i18n="tab.ask">ask</button>
       </nav>
 
-      <div id="panel-summary" class="panel" role="tabpanel">
-        <div class="panelhead"><h2>primera lección</h2><button id="genSummary" class="pill-btn">regenerar</button></div>
-        <div id="summaryOut" class="prose"><p class="empty-msg">Tu primera lección se preparará al pulsar «ready!».</p></div>
-      </div>
-
-      <div id="panel-cards" class="panel" role="tabpanel" hidden>
-        <div class="panelhead">
-          <h2>práctica de recuperación</h2>
-          <button id="genCards" class="pill-btn">regenerar práctica</button>
+      <div class="workspace">
+        <div id="panel-cards" class="panel" role="tabpanel" hidden>
+          <div class="panelhead">
+            <h2 data-i18n="cards.title">retrieval practice</h2>
+            <button id="genCards" class="pill-btn" data-i18n="cards.regen">regenerate practice</button>
+          </div>
+          <p id="cardCount" class="hint-sm"></p>
+          <div id="cardStage" class="stage"></div>
         </div>
-        <p id="cardCount" class="hint-sm"></p>
-        <div id="cardStage" class="stage"></div>
-      </div>
 
-      <div id="panel-quiz" class="panel" role="tabpanel" hidden>
-        <div class="panelhead">
-          <h2>reto de comprensión</h2>
-          <button id="genQuiz" class="pill-btn">regenerar reto</button>
+        <div id="panel-quiz" class="panel" role="tabpanel" hidden>
+          <div class="panelhead">
+            <h2 data-i18n="quiz.title">comprehension challenge</h2>
+            <button id="genQuiz" class="pill-btn" data-i18n="quiz.regen">regenerate challenge</button>
+          </div>
+          <div id="quizStage" class="stage"></div>
         </div>
-        <div id="quizStage" class="stage"><p class="empty-msg">Genera un quiz para comprobar si entendiste.</p></div>
+
+        <div id="panel-ask" class="panel" role="tabpanel" hidden>
+          <h2 data-i18n="ask.title">ask</h2>
+          <p id="askDisabled" class="empty-msg" hidden data-i18n="ask.disabledMobile"></p>
+          <div id="chat" class="chat" aria-live="polite"></div>
+          <form id="askForm" class="askform">
+            <input id="askInput" type="text" data-i18n-ph="ask.ph" placeholder="type your question…" autocomplete="off">
+            <button class="pill-btn" type="submit" id="askBtn" data-i18n="ask.send">send</button>
+          </form>
+        </div>
       </div>
 
-      <div id="panel-ask" class="panel" role="tabpanel" hidden>
-        <h2>pregunta</h2>
-        <div id="chat" class="chat" aria-live="polite"></div>
-        <form id="askForm" class="askform">
-          <input id="askInput" type="text" placeholder="escribe tu pregunta…" autocomplete="off">
-          <button class="pill-btn" type="submit" id="askBtn">enviar</button>
-        </form>
-      </div>
+      <figure class="deck-cards-visual" aria-hidden="true">
+        <img src="./assets/v2/deck-cards.png" alt="">
+      </figure>
     </section>
 
-    <figure class="deck-cards-visual" aria-hidden="true">
-      <img src="./assets/figma/deck-cards.png" alt="">
-    </figure>
-    <button class="deck-next" id="next" aria-label="Siguiente lección">Got it! <span>→→→</span></button>
+    <div class="deck-foot">
+      <div class="sectionbar">
+        <button id="prevSec" class="ghost-link" aria-label="Previous section">‹</button>
+        <div id="sectionLabel" class="section-label" data-i18n="doc.none">no material</div>
+        <button id="nextSec" class="ghost-link" aria-label="Next section">›</button>
+      </div>
+      <button class="deck-next" id="nextLesson" data-i18n="doc.nextLesson">Got it! →→→</button>
+    </div>
+
+    <!-- Focus timer (collapsible) -->
+    <aside class="focus-panel" id="focusPanel">
+      <button class="focus-toggle ghost-link" id="focusToggle">◔ timer</button>
+      <div class="focus-body" id="focusBody" hidden>
+        <div class="ring" role="timer" aria-live="off">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="54"/>
+            <circle id="arc" class="arc" cx="60" cy="60" r="54" transform="rotate(-90 60 60)"/>
+          </svg>
+          <div class="ring-text">
+            <span id="time">30:00</span>
+            <span id="phase"></span>
+          </div>
+        </div>
+        <div class="timer-controls">
+          <button id="start" class="pill-btn"></button>
+          <button id="reset" class="ghost-link" data-i18n="timer.reset">reset</button>
+        </div>
+        <label for="intention" class="intention-label" data-i18n="timer.intention">what will you achieve?</label>
+        <input id="intention" type="text" maxlength="120" data-i18n-ph="timer.intentionPh" class="intention-input">
+        <select id="focusMin" class="focus-select">
+          <option value="25">25 min</option>
+          <option value="30" selected>30 min</option>
+          <option value="45">45 min</option>
+          <option value="50">50 min</option>
+        </select>
+        <p id="cycles" class="hint-sm"></p>
+      </div>
+    </aside>
   </main>
 </div>
 
-<!-- ═══ DIÁLOGO REFLEXIÓN ═══ -->
+<!-- ═══ DIALOGS ═══ -->
+<dialog id="authDlg">
+  <form method="dialog" class="auth-form" id="authForm">
+    <h2 data-i18n="auth.title">Sign in to sync your courses</h2>
+    <p data-i18n="auth.sub">Passwordless: we email you a magic link.</p>
+    <input id="authEmail" type="email" required data-i18n-ph="auth.email" placeholder="you@example.com">
+    <div class="reflect-controls">
+      <button class="pill-btn" id="authSend" value="send" data-i18n="auth.send">send magic link</button>
+      <button class="ghost-link" value="cancel" formnovalidate>cancel</button>
+    </div>
+    <p id="authMsg" class="status-msg"></p>
+  </form>
+  <div id="authSigned" hidden>
+    <h2 id="authUserEmail"></h2>
+    <p id="authSyncNote" class="status-msg"></p>
+    <div class="reflect-controls">
+      <button class="ghost-link" id="authSignOut" data-i18n="nav.signout">sign out</button>
+      <button class="pill-btn" onclick="this.closest('dialog').close()">ok</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="reflect">
   <form method="dialog">
-    <h2>bloque terminado</h2>
+    <h2 data-i18n="timer.doneTitle">block finished</h2>
     <p id="reflectQ"></p>
     <div class="reflect-controls">
-      <button value="yes" class="pill-btn">lo logré</button>
-      <button value="partly" class="ghost-link">a medias</button>
-      <button value="no" class="ghost-link">no</button>
+      <button value="yes" class="pill-btn" data-i18n="timer.yes">nailed it</button>
+      <button value="partly" class="ghost-link" data-i18n="timer.partly">partly</button>
+      <button value="no" class="ghost-link" data-i18n="timer.no">no</button>
     </div>
   </form>
 </dialog>

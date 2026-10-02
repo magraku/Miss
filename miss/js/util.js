@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 export const $ = id => document.getElementById(id);
 
 export function esc(s) {
@@ -5,25 +7,26 @@ export function esc(s) {
 }
 
 let toastTimer;
-export function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+export function toast(msg, ms = 6000) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 6000);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-export function busy(btn, on, label = 'Generando…') {
-  if (on) { btn.dataset.label = btn.textContent; btn.textContent = label; btn.disabled = true; }
+export function busy(btn, on, label = null) {
+  if (!btn) return;
+  if (on) { btn.dataset.label = btn.textContent; btn.textContent = label ?? t('summary.generating'); btn.disabled = true; }
   else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }
 }
 
 export function errMsg(e) {
-  if (e instanceof TypeError) return 'No puedo conectar con Ollama. Comprueba que esté abierto (ollama serve).';
+  if (e instanceof TypeError) return t('err.ollama');
   return e.message || String(e);
 }
 
-// Markdown mínimo y seguro: negritas, cursivas, código, listas y títulos.
+// Minimal safe markdown: bold, italics, code, lists, headings. Input is escaped first.
 export function md(text) {
   const lines = esc(text).split('\n');
   let html = '', list = null;
@@ -46,4 +49,14 @@ export function md(text) {
   }
   close();
   return html;
+}
+
+export function debounce(fn, ms) {
+  let h;
+  return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); };
+}
+
+export function fmtDate(ts) {
+  try { return new Intl.DateTimeFormat(document.documentElement.lang || 'en', { dateStyle: 'medium' }).format(new Date(ts)); }
+  catch { return new Date(ts).toLocaleDateString(); }
 }

@@ -1,8 +1,10 @@
-// Temporizador de concentración: bloque + pausa, con reflexión al terminar.
+// Focus timer: block + break, reflection at the end.
 import { state, save, addXP, todaySessions, day } from './store.js';
 import { $ } from './util.js';
+import { t, applyI18n } from './i18n.js';
+import { bus } from './store.js';
 
-const C = 2 * Math.PI * 54; // circunferencia del anillo
+const C = 2 * Math.PI * 54; // ring circumference
 let phase = 'focus';        // 'focus' | 'break'
 let running = false, endAt = 0, remaining = 0, total = 0, timer = null;
 
@@ -12,13 +14,15 @@ function fmt(ms) {
 }
 
 function render() {
-  $('time').textContent = fmt(remaining);
-  $('arc').style.strokeDashoffset = String(C * (1 - (total ? remaining / total : 1)));
-  $('phase').textContent = phase === 'focus' ? 'concentración' : 'descanso';
+  const time = $('time'), arc = $('arc'), ph = $('phase'), start = $('start'), cyc = $('cycles');
+  if (!time) return; // view not present
+  time.textContent = fmt(remaining);
+  arc.style.strokeDashoffset = String(C * (1 - (total ? remaining / total : 1)));
+  ph.textContent = t(phase === 'focus' ? 'timer.focus' : 'timer.break');
   document.body.dataset.phase = running ? phase : 'idle';
-  $('start').textContent = running ? 'pausar' : (remaining < total ? 'continuar' : 'comenzar');
-  $('cycles').textContent = `bloques hoy: ${todaySessions().length}`;
-  document.title = running ? `${fmt(remaining)} · Sosiego` : 'Sosiego · estudia con calma';
+  start.textContent = running ? t('timer.pause') : (remaining < total ? t('timer.resume') : t('timer.start'));
+  cyc.textContent = t('timer.blocks', { n: todaySessions().length });
+  document.title = running ? `${fmt(remaining)} · MissPedia` : 'MissPedia';
 }
 
 function setDuration(min) { total = remaining = min * 60000; render(); }
@@ -35,14 +39,15 @@ function beep() {
       o.connect(g).connect(ctx.destination);
       o.start(ctx.currentTime + i * 0.35); o.stop(ctx.currentTime + i * 0.35 + 0.7);
     });
-  } catch { /* sin audio */ }
+  } catch { /* no audio */ }
 }
 
 function start() {
   if (running) return;
-  if (phase === 'focus' && remaining === total && !$('intention').value.trim()) {
-    $('intention').focus();
-    $('intention').placeholder = 'Escribe qué vas a lograr antes de empezar';
+  const intention = $('intention');
+  if (phase === 'focus' && remaining === total && !intention.value.trim()) {
+    intention.focus();
+    intention.placeholder = t('timer.intentionReq');
     return;
   }
   if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
@@ -70,20 +75,21 @@ function finish() {
   running = false;
   beep();
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(phase === 'focus' ? 'Bloque terminado' : 'Fin del descanso');
+    new Notification(phase === 'focus' ? t('timer.notifFocus') : t('timer.notifBreak'));
   }
   if (phase === 'focus') {
     const session = { day: day(), minutes: total / 60000, intention: $('intention').value.trim(), result: null };
     state.sessions.push(session);
-    $('reflectQ').textContent = `¿Lograste esto? “${session.intention}”`;
-    $('reflect').returnValue = '';
-    $('reflect').showModal();
-    $('reflect').addEventListener('close', () => {
-      session.result = $('reflect').returnValue || 'partly';
+    $('reflectQ').textContent = t('timer.doneQ', { i: session.intention });
+    const dlg = $('reflect');
+    dlg.returnValue = '';
+    dlg.showModal();
+    dlg.addEventListener('close', () => {
+      session.result = dlg.returnValue || 'partly';
       save();
       addXP(session.result === 'yes' ? 25 : 10);
       phase = 'break';
-      setDuration(state.sessions.filter(s => s.day === day()).length % 4 === 0 ? 15 : 5);
+      setDuration(todaySessions().length % 4 === 0 ? 15 : 5);
       start();
     }, { once: true });
   } else {
@@ -93,15 +99,19 @@ function finish() {
   render();
 }
 
-$('start').onclick = () => (running ? pause() : start());
-$('reset').onclick = () => {
-  clearInterval(timer); running = false; phase = 'focus';
-  setDuration(Number($('focusMin').value));
-};
-$('focusMin').onchange = () => {
-  state.settings.focusMin = Number($('focusMin').value); save();
-  if (!running && phase === 'focus') setDuration(state.settings.focusMin);
-};
-
-$('focusMin').value = String(state.settings.focusMin);
-setDuration(state.settings.focusMin);
+export function initTimer() {
+  const startBtn = $('start'), resetBtn = $('reset'), focusSel = $('focusMin');
+  if (!startBtn) return;
+  startBtn.onclick = () => (running ? pause() : start());
+  resetBtn.onclick = () => {
+    clearInterval(timer); running = false; phase = 'focus';
+    setDuration(Number(focusSel.value));
+  };
+  focusSel.onchange = () => {
+    state.settings.focusMin = Number(focusSel.value); save();
+    if (!running && phase === 'focus') setDuration(state.settings.focusMin);
+  };
+  focusSel.value = String(state.settings.focusMin);
+  bus.addEventListener('lang', render);
+  setDuration(state.settings.focusMin);
+}
