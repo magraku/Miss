@@ -22,8 +22,10 @@ let _caps = null;
 export async function probeCapabilities() {
   if (_caps) return _caps;
   const ua = navigator.userAgent;
-  const mobile = /Mobi|Android|iPhone|iPad/i.test(ua) ||
-    (matchMedia('(pointer:coarse)').matches && Math.min(screen.width, screen.height) < 820);
+  // UA-only detection: touchscreen laptops (pointer:coarse + small screens)
+  // are PCs — they can still use the cloud fallback. Mobile = phones/tablets.
+  const mobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS pretends to be a Mac
   const mem = navigator.deviceMemory || 8; // Chrome-only; assume OK elsewhere
   // 'gpu' existing ≠ WebGPU usable: requestAdapter() returns null on
   // unsupported hardware, VMs and remote desktops.
