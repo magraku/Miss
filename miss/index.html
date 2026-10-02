@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Miss · aprende</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script type="module" src="./js/app.js"></script>
+</head>
+<body data-phase="idle" data-view="home">
+
+<!-- ═══ VISTA HOME ═══ -->
+<div class="view view-home" id="view-home">
+
+  <div class="home-backdrop" aria-hidden="true">
+    <img src="./assets/figma/home-squiggle-left.svg" class="home-squiggle home-squiggle-left" alt="">
+    <img src="./assets/figma/home-squiggle-right.svg" class="home-squiggle home-squiggle-right" alt="">
+  </div>
+
+  <header class="home-header">
+    <p class="tagline">What are we learning today?</p>
+  </header>
+
+  <!-- Círculo grande: drop zone -->
+  <div class="drop-ring-wrap">
+    <div class="drop-ring" id="dropRing">
+      <img class="liquid-surface" src="./assets/figma/home-background.png" alt="">
+      <input id="file" type="file" accept="application/pdf,.txt,.md" aria-label="Sube tu material">
+      <div class="drop-inner">
+        <span class="drop-label" id="dropLabel">put your files here.</span>
+        <span class="drop-hint" id="dropHint">pdf · txt · md</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Texto pegado -->
+  <div class="paste-toggle-wrap">
+    <button class="ghost-link" id="togglePaste">or paste text instead</button>
+    <div class="paste-box" id="pasteBox" hidden>
+      <textarea id="paste" rows="4" placeholder="paste your notes here…"></textarea>
+      <button class="pill-btn" id="usePaste">use this text</button>
+    </div>
+  </div>
+
+  <!-- Círculo pequeño: ready -->
+  <div class="ready-ring-wrap">
+    <button class="ready-ring" id="readyBtn" disabled>
+      <img class="ready-liquid" src="./assets/figma/home-liquid.png" alt="">
+      <span>ready!</span>
+    </button>
+    <div class="model-status">
+      <span id="status" class="dot" title="Ollama status"></span>
+      <select id="model" aria-label="Ollama model"></select>
+      <button id="reconnect" class="ghost-link" hidden>reconnect</button>
+    </div>
+  </div>
+
+  <p id="docStatus" class="status-msg" aria-live="polite"></p>
+</div>
+
+<!-- ═══ VISTA DATA DECK ═══ -->
+<div class="view view-study" id="view-study" hidden>
+  <header class="study-bar">
+    <button class="back-btn" id="backBtn">← Miss</button>
+    <div class="study-meta">
+      <span id="docName" class="doc-name"></span>
+      <span id="streak">0 días</span>
+      <span id="xp">0 XP</span>
+    </div>
+    <div class="study-model">
+      <span id="status2" class="dot"></span>
+      <select id="model2" aria-label="Modelo"></select>
+    </div>
+  </header>
+
+  <main class="study-layout deck-layout">
+    <img src="./assets/figma/deck-squiggle-left.svg" class="deck-squiggle deck-squiggle-left" alt="">
+    <img src="./assets/figma/deck-squiggle-right.svg" class="deck-squiggle deck-squiggle-right" alt="">
+
+    <div class="deck-brand" aria-label="Data Deck">
+      <img src="./assets/figma/deck-logo.png" alt="">
+      <h1>Data Deck</h1>
+    </div>
+
+    <aside class="focus-panel deck-legacy" aria-hidden="true">
+      <div class="ring" role="timer" aria-live="off">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="track" cx="60" cy="60" r="54"/>
+          <circle id="arc" class="arc" cx="60" cy="60" r="54" transform="rotate(-90 60 60)"/>
+        </svg>
+        <div class="ring-text">
+          <span id="time">30:00</span>
+          <span id="phase">concentración</span>
+        </div>
+      </div>
+
+      <div class="timer-controls">
+        <button id="start" class="pill-btn">comenzar</button>
+        <button id="reset" class="ghost-link">reiniciar</button>
+      </div>
+
+      <label for="intention" class="intention-label">¿qué vas a lograr?</label>
+      <input id="intention" type="text" maxlength="120" placeholder="ej. entender la sección 2…" class="intention-input">
+
+      <select id="focusMin" class="focus-select">
+        <option value="25">25 min</option>
+        <option value="30" selected>30 min</option>
+        <option value="45">45 min</option>
+        <option value="50">50 min</option>
+      </select>
+      <p id="cycles" class="hint-sm">bloques hoy: 0</p>
+
+      <!-- Secciones del doc -->
+      <div class="sections-wrap">
+        <div class="sectionbar">
+          <button id="prevLegacy" class="ghost-link" aria-label="Anterior">‹</button>
+          <div id="sectionLabel" class="section-label">sin material</div>
+          <button id="nextLegacy" class="ghost-link" aria-label="Siguiente">›</button>
+        </div>
+        <ol id="sections" class="sections"></ol>
+      </div>
+    </aside>
+
+    <section class="workspace deck-workspace">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="summary" aria-selected="true">lección</button>
+        <button role="tab" data-tab="cards" aria-selected="false" tabindex="-1">práctica</button>
+        <button role="tab" data-tab="quiz" aria-selected="false" tabindex="-1">reto</button>
+        <button role="tab" data-tab="ask" aria-selected="false" tabindex="-1">preguntar</button>
+      </nav>
+
+      <div id="panel-summary" class="panel" role="tabpanel">
+        <div class="panelhead"><h2>primera lección</h2><button id="genSummary" class="pill-btn">regenerar</button></div>
+        <div id="summaryOut" class="prose"><p class="empty-msg">Tu primera lección se preparará al pulsar «ready!».</p></div>
+      </div>
+
+      <div id="panel-cards" class="panel" role="tabpanel" hidden>
+        <div class="panelhead">
+          <h2>práctica de recuperación</h2>
+          <button id="genCards" class="pill-btn">regenerar práctica</button>
+        </div>
+        <p id="cardCount" class="hint-sm"></p>
+        <div id="cardStage" class="stage"></div>
+      </div>
+
+      <div id="panel-quiz" class="panel" role="tabpanel" hidden>
+        <div class="panelhead">
+          <h2>reto de comprensión</h2>
+          <button id="genQuiz" class="pill-btn">regenerar reto</button>
+        </div>
+        <div id="quizStage" class="stage"><p class="empty-msg">Genera un quiz para comprobar si entendiste.</p></div>
+      </div>
+
+      <div id="panel-ask" class="panel" role="tabpanel" hidden>
+        <h2>pregunta</h2>
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <form id="askForm" class="askform">
+          <input id="askInput" type="text" placeholder="escribe tu pregunta…" autocomplete="off">
+          <button class="pill-btn" type="submit" id="askBtn">enviar</button>
+        </form>
+      </div>
+    </section>
+
+    <figure class="deck-cards-visual" aria-hidden="true">
+      <img src="./assets/figma/deck-cards.png" alt="">
+    </figure>
+    <button class="deck-next" id="next" aria-label="Siguiente lección">Got it! <span>→→→</span></button>
+  </main>
+</div>
+
+<!-- ═══ DIÁLOGO REFLEXIÓN ═══ -->
+<dialog id="reflect">
+  <form method="dialog">
+    <h2>bloque terminado</h2>
+    <p id="reflectQ"></p>
+    <div class="reflect-controls">
+      <button value="yes" class="pill-btn">lo logré</button>
+      <button value="partly" class="ghost-link">a medias</button>
+      <button value="no" class="ghost-link">no</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
