@@ -89,7 +89,8 @@ async function* nanoStream(messages) {
 }
 
 /* ───────── WebLLM (Web Worker) ───────── */
-let worker = null, engine = null, webllm = null;
+let worker = null, engine = null, webllm = null, modelId = null;
+const STALL_MS = 45000; // no progress for 45s → the HF download froze → retry
 
 async function pickModel() {
   const { mem } = capabilities();
@@ -102,21 +103,60 @@ async function pickModel() {
   return list.find(id => /1b|1\.7b|2b/i.test(id)) || list[0];
 }
 
+function killWebllm() {
+  try { worker?.terminate(); } catch { /* noop */ }
+  worker = null; engine = null;
+}
+
+function webllmInit(onProgress) {
+  return new Promise((resolve, reject) => {
+    let lastTick = Date.now();
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastTick > STALL_MS) reject(new Error('download stalled — check your connection'));
+    }, 5000);
+    webllm.CreateWebWorkerMLCEngine(worker, modelId, {
+      initProgressCallback: r => { lastTick = Date.now(); onProgress?.(r.progress, r.text); },
+    }).then(resolve, reject).finally(() => clearInterval(watchdog));
+  });
+}
+
 async function webllmLoad(onProgress) {
   if (engine) return;
   webllm = await import(CONFIG.WEBLLM_CDN);
-  worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-  const modelId = await pickModel();
-  engine = await webllm.CreateWebWorkerMLCEngine(worker, modelId, {
-    initProgressCallback: r => onProgress?.(r.progress, r.text),
-  });
-  patch({ model: modelId });
+  modelId = await pickModel();
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      killWebllm();
+      worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+      engine = await webllmInit(onProgress);
+      patch({ model: modelId });
+      return;
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  killWebllm();
+  throw lastErr;
+}
+
+// Engine may report ready while weights never loaded (Edge/VM quirks) — reload once.
+async function ensureEngineLoaded() {
+  if (!engine) await webllmLoad();
+  if (engine?.reload) await engine.reload(modelId).catch(() => {});
 }
 
 async function* webllmStream(messages) {
-  const chunks = await engine.chat.completions.create({
-    messages, stream: true, temperature: 0.4, max_tokens: 2048,
-  });
+  let chunks;
+  try {
+    chunks = await engine.chat.completions.create({
+      messages, stream: true, temperature: 0.4, max_tokens: 2048,
+    });
+  } catch (e) {
+    if (/ModelNotLoaded/i.test(String(e))) { await ensureEngineLoaded(); return yield* webllmStream(messages); }
+    throw e;
+  }
   for await (const c of chunks) {
     const d = c.choices[0]?.delta?.content;
     if (d) yield d;
@@ -124,11 +164,16 @@ async function* webllmStream(messages) {
 }
 
 async function webllmJSON(messages, schema) {
-  const r = await engine.chat.completions.create({
-    messages, stream: false, temperature: 0.3, max_tokens: 2048,
-    response_format: { type: 'json_object', schema: JSON.stringify(schema) },
-  });
-  return r.choices[0]?.message?.content || '';
+  try {
+    const r = await engine.chat.completions.create({
+      messages, stream: false, temperature: 0.3, max_tokens: 2048,
+      response_format: { type: 'json_object', schema: JSON.stringify(schema) },
+    });
+    return r.choices[0]?.message?.content || '';
+  } catch (e) {
+    if (/ModelNotLoaded/i.test(String(e))) { await ensureEngineLoaded(); return webllmJSON(messages, schema); }
+    throw e;
+  }
 }
 
 /* ───────── Public API (same shape as the old Ollama client) ───────── */
@@ -173,7 +218,7 @@ export async function connect() {
             message: `${t('home.noWebgpu')} [${caps.gpuReason}${caps.mobile ? '+mobile' : ''}]` });
   } catch (e) {
     console.warn('engine init failed', e);
-    patch({ backend: null, status: 'error', message: `${t('home.reconnect')} — ${e.message}` });
+    patch({ backend: null, status: 'error', message: `${t('home.reconnect')} — ${e?.message || String(e)}` });
   }
 }
 
