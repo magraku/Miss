@@ -175,7 +175,7 @@ async function openCourse(id) {
   if (!p || !p.chunks?.length) { toast(p ? t('lib.bodyMissing') : t('lib.empty')); return; }
   state.doc = {
     id, name: p.name, lang: p.lang || 'en',
-    chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {},
+    chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {}, quizzes: p.quizzes || {},
     current: p.current ?? 0, done: p.done || [],
     apis: p.apis || [],
   };
@@ -267,7 +267,7 @@ async function loadDoc(name, chunks) {
   const dLang = detectLang(text) || 'en';
   state.doc = {
     id: crypto.randomUUID(), name, lang: dLang,
-    chunks, current: 0, done: [], summaries: {}, questions: {},
+    chunks, current: 0, done: [], summaries: {}, questions: {}, quizzes: {},
   };
   await persistDoc();
   upsertLibrary({ id: state.doc.id, name, lang: dLang, updatedAt: Date.now(), total: chunks.length, done: 0 });

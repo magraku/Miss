@@ -103,8 +103,8 @@ résumé passif. Réponds en Markdown, avec concision :
 };
 
 export const CARDS_REQUEST = {
-en: `Create 5 to 8 study flashcards from this text, styled like collectible
-cards: each card is ONE key concept. Fields: "title" (2-4 word card name),
+en: `Create 8 to 12 study flashcards covering the whole document, styled like
+collectible cards: each card is ONE key concept, the essential points only. Fields: "title" (2-4 word card name),
 "front" (a question requiring recall or explanation — never yes/no), "back"
 (an informative answer of 1-3 sentences with the key facts — enough to learn
 from the card alone), "img" (a 5-10 word English visual prompt that illustrates
@@ -114,8 +114,9 @@ Reply as JSON: {"cards": [{"title", "front", "back", "img"}, ...]}
 
 TEXT:
 `,
-fr: `Crée 5 à 8 cartes de révision à partir de ce texte, dans le style des
-cartes à collectionner : chaque carte = UN concept clé. Champs : "title" (nom
+fr: `Crée 8 à 12 cartes de révision couvrant tout le document, dans le style
+des cartes à collectionner : chaque carte = UN concept clé, les points
+essentiels seulement. Champs : "title" (nom
 de carte en 2-4 mots), "front" (question obligeant à se souvenir ou expliquer —
 jamais de oui/non), "back" (réponse informative de 1-3 phrases avec les faits
 clés — assez pour apprendre avec la carte seule), "img" (prompt visuel en

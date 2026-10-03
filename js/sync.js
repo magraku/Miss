@@ -53,6 +53,7 @@ async function pushActive() {
     lang: d.lang || 'en',
     payload: {
       chunks: d.chunks, summaries: d.summaries, questions: d.questions || {},
+      quizzes: d.quizzes || {},
       current: d.current, done: d.done, apis: d.apis || [],
       cards: state.cards.filter(c => c.docId === d.id),
     },
@@ -79,6 +80,7 @@ export async function pullAll() {
     if (state.doc?.id === row.doc_key && !state.doc.chunks?.length && p.chunks?.length) {
       Object.assign(state.doc, {
         chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {},
+        quizzes: p.quizzes || {},
         current: p.current ?? 0, done: p.done || [],
       });
       bus.dispatchEvent(new Event('doc'));

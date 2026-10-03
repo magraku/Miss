@@ -100,18 +100,21 @@ function rate(r) {
 }
 
 export async function genCards({ automatic = false } = {}) {
-  const ch = chunk();
-  if (!ch) return toast(t('summary.needDoc'));
+  const d = state.doc;
+  if (!d?.chunks?.length) return toast(t('summary.needDoc'));
   const btn = $('genCards'); busy(btn, true);
   try {
-    const d = state.doc;
+    // Cards synthesize the WHOLE document — sample every section so the deck
+    // covers the subject, not just the current chunk (context stays bounded).
+    const per = Math.max(800, Math.floor(12000 / d.chunks.length));
+    const docText = d.chunks.map(c => c.text.slice(0, per)).join('\n\n');
     const data = await chatJSON([
       { role: 'system', content: sys(d) },
-      { role: 'user', content: CARDS_REQUEST[docLang(d)] + ch.text },
+      { role: 'user', content: CARDS_REQUEST[docLang(d)] + docText },
     ], CARD_SCHEMA);
     const now = Date.now();
     const fresh = (data.cards || []).filter(c => c.front && c.back)
-      .map(c => ({ id: crypto.randomUUID(), title: c.title || '', front: c.front, back: c.back, img: c.img || '', box: 0, due: now, docId: d.id, section: d.current }));
+      .map(c => ({ id: crypto.randomUUID(), title: c.title || '', front: c.front, back: c.back, img: c.img || '', box: 0, due: now, docId: d.id }));
     if (!fresh.length) throw new Error(t('err.noCards'));
     state.cards.push(...fresh); save();
     buildQueue();
@@ -130,6 +133,34 @@ const QUIZ_SCHEMA = {
   required: ['questions'],
 };
 let quiz = null;
+
+function saveQuiz() {
+  const d = state.doc;
+  if (!d || !quiz) return;
+  d.quizzes = d.quizzes || {};
+  d.quizzes[d.current] = quiz;
+  void persistDoc();
+}
+
+// Renders the locked, post-answer state — shared by a fresh click and by a
+// reload restoring a question the learner already answered.
+function showAnswered(q, pick) {
+  const stage = $('quizStage');
+  const ok = pick === q.answer;
+  if (q.picked === undefined) {
+    q.picked = pick;
+    if (ok) { quiz.score++; addXP(5); }
+    saveQuiz();
+  }
+  stage.querySelectorAll('.options button').forEach((x, i) => {
+    x.disabled = true;
+    if (i === q.answer) x.classList.add('right');
+    else if (i === pick) x.classList.add('wrong');
+  });
+  $('fb').innerHTML = `<div class="feedback"><strong>${ok ? t('quiz.correct') : t('quiz.wrong')}</strong> ${esc(q.explanation || '')}</div><button id="nextQ" class="pill-btn">${quiz.i + 1 < quiz.qs.length ? t('quiz.next') : t('quiz.result')}</button>`;
+  $('nextQ').onclick = () => { quiz.i++; saveQuiz(); renderQuiz(); };
+  $('nextQ').focus();
+}
 
 function renderQuiz() {
   const stage = $('quizStage');
@@ -150,19 +181,9 @@ function renderQuiz() {
     <h3>${esc(q.question)}</h3>
     <div class="options">${q.options.map((o, i) => `<button class="pill-btn" data-i="${i}">${esc(o)}</button>`).join('')}</div>
     <div id="fb"></div>`;
-  stage.querySelectorAll('.options button').forEach(b => {
-    b.onclick = () => {
-      const pick = Number(b.dataset.i), ok = pick === q.answer;
-      stage.querySelectorAll('.options button').forEach((x, i) => {
-        x.disabled = true;
-        if (i === q.answer) x.classList.add('right');
-        else if (i === pick) x.classList.add('wrong');
-      });
-      if (ok) { quiz.score++; addXP(5); }
-      $('fb').innerHTML = `<div class="feedback"><strong>${ok ? t('quiz.correct') : t('quiz.wrong')}</strong> ${esc(q.explanation || '')}</div><button id="nextQ" class="pill-btn">${quiz.i + 1 < quiz.qs.length ? t('quiz.next') : t('quiz.result')}</button>`;
-      $('nextQ').onclick = () => { quiz.i++; renderQuiz(); };
-      $('nextQ').focus();
-    };
+  if (q.picked !== undefined) showAnswered(q, q.picked);
+  else stage.querySelectorAll('.options button').forEach(b => {
+    b.onclick = () => showAnswered(q, Number(b.dataset.i));
   });
 }
 
@@ -184,6 +205,7 @@ export async function genQuiz({ automatic = false } = {}) {
       });
     if (!qs.length) throw new Error(t('err.noQuiz'));
     quiz = { qs, i: 0, score: 0 };
+    saveQuiz();
     renderQuiz();
     return qs.length;
   } catch (e) { toast(errMsg(e)); } finally { busy(btn, false); }
@@ -193,16 +215,17 @@ export function initStudy() {
   const gc = $('genCards'), gq = $('genQuiz');
   if (gc) gc.onclick = () => genCards();
   if (gq) gq.onclick = () => genQuiz();
-  // Reset the quiz only when the doc or section actually changes — a plain
-  // progress save (e.g. mastering this very quiz) must not wipe the result.
+  // Restore or reset the quiz only when the doc or section actually changes —
+  // a plain progress save (e.g. mastering this very quiz) must not wipe it.
   let studyFor = null;
   bus.addEventListener('doc', () => {
     const key = state.doc ? `${state.doc.id}:${state.doc.current}` : null;
     if (key === studyFor) { buildQueue(); return; }
     studyFor = key;
-    quiz = null;
+    quiz = state.doc?.quizzes?.[state.doc.current] || null;
     const qs = $('quizStage');
-    if (qs) qs.innerHTML = `<p class="empty-msg">${t('quiz.empty')}</p>`;
+    if (quiz && qs) renderQuiz();
+    else if (qs) qs.innerHTML = `<p class="empty-msg">${t('quiz.empty')}</p>`;
     buildQueue();
   });
   buildQueue();
