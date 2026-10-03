@@ -1,12 +1,12 @@
 // MissPedia — main controller. Views: home / library / study (Data Deck).
 import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse } from './store.js';
 import { connect, chatStream, engineState, onEngineChange, probeCapabilities, whenEngineReady } from './llm.js';
-import { extractPdf, chunkPages, chunkPlain, retrieve, detectLang } from './docs.js';
+import { extractPdf, chunkPages, chunkPlain, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
 import { t, setLang, applyI18n, lang } from './i18n.js';
-import { sys, FIRST_LESSON_REQUEST, ASK_SUFFIX, API_APPENDIX, docLang, EVAL_REQUEST, EVAL_SCHEMA } from './instructional.js';
+import { sys, FIRST_LESSON_REQUEST, API_APPENDIX, docLang, EVAL_REQUEST, EVAL_SCHEMA } from './instructional.js';
 import { chatJSON } from './llm.js';
-import { matchApis, searchApis, formatApisForContext } from './apilib.js';
+import { matchApis, formatApisForContext } from './apilib.js';
 import { initAuth, signIn, signOut, auth, authEnabled, deleteRemote } from './sync.js';
 import { CONFIG } from './config.js';
 import { initStudy, generateLearningTools } from './study.js';
@@ -28,6 +28,7 @@ bus.addEventListener('stats', renderStats);
 const VIEWS = ['home', 'library', 'study'];
 function showView(name) {
   VIEWS.forEach(v => { $(`view-${v}`).hidden = v !== name; });
+  $('topTabs').hidden = name !== 'study';
   if (name === 'library') renderLibrary();
   if (name === 'study') { renderDoc(); renderStats(); }
 }
@@ -42,7 +43,7 @@ function showTab(name) {
   });
   document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== `panel-${name}`; });
   $('panel-summary').hidden = name !== 'summary';
-  document.querySelector('.study-layout').classList.toggle('wide', name !== 'summary');
+  document.querySelector('.workspace').hidden = name === 'summary';
 }
 tabs.forEach(tb => { tb.onclick = () => showTab(tb.dataset.tab); });
 
@@ -68,18 +69,21 @@ function updateEngineUI() {
       (caps.canGenerate ? '' : t('home.noWebgpu'));
     retry.hidden = engineState.status !== 'error';
   }
-  // Ask tab needs the engine
-  const askOff = $('askDisabled');
-  if (askOff) askOff.hidden = ready;
-  const askForm = $('askForm');
-  if (askForm) askForm.style.display = ready ? '' : 'none';
+  renderDoc(); // next-section lock depends on whether the AI can evaluate answers
 }
 onEngineChange(updateEngineUI);
 
 $('engineRetry').onclick = () => { engineState.status = 'idle'; void connect(); };
 
 /* ── Top bar: lang / donate / auth / library ── */
-document.querySelectorAll('.lang-toggle button').forEach(b => { b.onclick = () => setLang(b.dataset.lang); });
+document.querySelectorAll('.topbar .lang-toggle button').forEach(b => {
+  b.onclick = () => {
+    setLang(b.dataset.lang);
+    // Courses are generated in the document's own language — switching the UI
+    // language later does not translate an existing course.
+    if (state.doc) toast(t('lang.courseNote'));
+  };
+});
 $('navDonate').href = CONFIG.DONATE_URL || '#';
 $('navDonate').onclick = e => { if (!CONFIG.DONATE_URL) { e.preventDefault(); toast('Donation link coming soon — thank you!'); } };
 $('brandHome').onclick = e => { e.preventDefault(); showView('home'); };
@@ -248,7 +252,7 @@ async function loadDoc(name, chunks) {
   };
   await persistDoc();
   upsertLibrary({ id: state.doc.id, name, lang: dLang, updatedAt: Date.now(), total: chunks.length, done: 0 });
-  // Match free public APIs to the document subject (context for lessons + ask).
+  // Match free public APIs to the document subject (context for lessons).
   relatedApis = [];
   matchApis(chunks).then(list => {
     relatedApis = list;
@@ -270,7 +274,14 @@ function renderDoc() {
   const prev = $('prevSec'), next = $('nextSec'), nextL = $('nextLesson');
   if (d) {
     prev.disabled = d.current === 0;
-    next.disabled = nextL.disabled = d.current >= d.chunks.length - 1;
+    // One question, one gate: the next section only unlocks once the AI has
+    // judged the learner's answer "mastered" (or a challenge was passed).
+    // Without a running engine (mobile review) navigation stays free.
+    const canEvaluate = engineState.status === 'ready';
+    const unlocked = !canEvaluate || d.done.includes(d.current);
+    next.disabled = nextL.disabled = d.current >= d.chunks.length - 1 || !unlocked;
+    nextL.textContent = unlocked ? t('doc.nextLesson') : t('doc.locked');
+    nextL.classList.toggle('locked', !unlocked);
   }
   const dn = $('docName');
   if (dn) dn.textContent = d ? d.name : '';
@@ -288,6 +299,7 @@ $('prevSec').onclick = () => goTo(state.doc.current - 1);
 $('nextSec').onclick = () => goTo(state.doc.current + 1);
 $('nextLesson').onclick = () => goTo(state.doc.current + 1);
 bus.addEventListener('doc', renderDoc);
+bus.addEventListener('lang', renderDoc); // keep the lock label in the right language
 
 /* ── Lesson (summary) ── */
 function renderSummary() {
@@ -295,6 +307,10 @@ function renderSummary() {
   const out = $('summaryOut');
   if (out) out.innerHTML = s ? md(s) : `<p class="empty-msg">${t('summary.empty')}</p>`;
 }
+
+const learner = () => state.settings.name
+  ? `\n\n${docLang(state.doc) === 'fr' ? "Le prénom de l'apprenant·e est" : "The learner's first name is"} ${state.settings.name}.`
+  : '';
 
 const genSummaryBtn = $('genSummary');
 async function genSummary({ automatic = false } = {}) {
@@ -309,7 +325,7 @@ async function genSummary({ automatic = false } = {}) {
   try {
     for await (const t_ of chatStream([
       { role: 'system', content: sys(d) },
-      { role: 'user', content: `${FIRST_LESSON_REQUEST[docLang(d)]}\n\n${docLang(d) === 'fr' ? 'MATÉRIAU DE LA SECTION' : 'SECTION MATERIAL'}:\n${ch.text}${apiBlock}` },
+      { role: 'user', content: `${FIRST_LESSON_REQUEST[docLang(d)]}${learner()}\n\n${docLang(d) === 'fr' ? 'MATÉRIAU DE LA SECTION' : 'SECTION MATERIAL'}:\n${ch.text}${apiBlock}` },
     ])) { acc += t_; out.innerHTML = md(acc); }
     if (!acc.trim()) throw new Error(t('err.notJson'));
     state.doc.summaries[idx] = acc; save(); await persistDoc();
@@ -320,13 +336,19 @@ async function genSummary({ automatic = false } = {}) {
 if (genSummaryBtn) genSummaryBtn.onclick = () => { void genSummary(); };
 
 /* ── Evaluator (Maria's loop: no progress without comprehension) ── */
+let evalFor = null; // "docId:section" the eval box currently belongs to
 function renderEvalBox() {
   const box = $('evalBox');
   if (!box) return;
-  const hasLesson = !!(state.doc && state.doc.summaries[state.doc.current]);
+  const d = state.doc;
+  const key = d ? `${d.id}:${d.current}` : null;
+  const hasLesson = !!(d && d.summaries[d.current]);
   box.hidden = !(hasLesson && engineState.status === 'ready');
-  $('evalFeedback').innerHTML = '';
-  $('evalInput').value = '';
+  if (key !== evalFor) { // only reset the conversation when the section changes
+    evalFor = key;
+    $('evalFeedback').innerHTML = '';
+    $('evalInput').value = '';
+  }
 }
 bus.addEventListener('doc', renderEvalBox);
 onEngineChange(renderEvalBox);
@@ -340,16 +362,22 @@ async function evaluateAnswer() {
   try {
     const r = await chatJSON([
       { role: 'system', content: sys(d) },
-      { role: 'user', content: `${EVAL_REQUEST[docLang(d)]}\n\nLESSON MATERIAL:\n${ch.text}\n\nLESSON:\n${d.summaries[d.current]}\n\nLEARNER ANSWER:\n${answer}` },
+      { role: 'user', content: `${EVAL_REQUEST[docLang(d)]}${learner()}\n\nLESSON MATERIAL:\n${ch.text}\n\nLESSON:\n${d.summaries[d.current]}\n\nLEARNER ANSWER:\n${answer}` },
     ], EVAL_SCHEMA);
     const fb = $('evalFeedback');
     const cls = r.verdict === 'mastered' ? 'eval-good' : r.verdict === 'partial' ? 'eval-mid' : 'eval-bad';
-    fb.innerHTML = `<div class="eval-msg ${cls}">${md(r.feedback)}${r.followup ? `<p class="eval-follow">${esc(r.followup)}</p>` : ''}</div>`;
+    fb.innerHTML = `<div class="eval-msg ${cls}">${md(r.feedback)}${r.verdict !== 'mastered' && r.followup ? `<p class="eval-follow">${esc(r.followup)}</p>` : ''}</div>`;
     if (r.verdict === 'mastered') {
       addXP(8);
       fb.innerHTML += `<p class="eval-mastered">${t('eval.mastered')}</p>`;
       $('evalInput').value = '';
-      if (!d.done.includes(d.current)) { /* mark progress softly */ }
+      if (!d.done.includes(d.current)) {
+        d.done.push(d.current);
+        const meta = state.library.find(c => c.id === d.id);
+        if (meta) upsertLibrary({ ...meta, done: d.done.length, updatedAt: Date.now() });
+        notifyDoc();
+        void persistDoc();
+      }
     }
   } catch (e) { toast(errMsg(e)); } finally { busy(btn, false); }
 }
@@ -411,53 +439,44 @@ $('backBtn').onclick = () => showView('library');
 /* ── Focus panel toggle ── */
 $('focusToggle').onclick = () => { $('focusBody').hidden = !$('focusBody').hidden; };
 
-/* ── Ask ── */
-const history = [];
-function bubble(cls, html) {
-  const el = document.createElement('div');
-  el.className = `msg ${cls}`;
-  el.innerHTML = html;
-  $('chat').appendChild(el);
-  $('chat').scrollTop = $('chat').scrollHeight;
-  return el;
+/* ── Onboarding: first name + language, asked once ── */
+let obLang = null;
+function renderGreeting() {
+  const el = $('homeTagline');
+  if (!el) return;
+  const name = state.settings.name;
+  el.textContent = name ? t('app.taglineName', { name }) : t('app.tagline');
 }
+bus.addEventListener('lang', renderGreeting);
 
-$('askForm').onsubmit = async e => {
-  e.preventDefault();
-  const q = $('askInput').value.trim();
-  if (!q) return;
-  if (!state.doc) return toast(t('ask.needDoc'));
-  $('askInput').value = '';
-  bubble('user', esc(q));
-  const hits = retrieve(state.doc.chunks, q, 3);
-  const context = hits.map(h => `[${t('doc.section', { n: h.index + 1 })}]\n${h.chunk.text}`).join('\n\n');
-  // If the question is about APIs, enrich with matching catalog entries.
-  const apiHits = await searchApis(q).catch(() => []);
-  const apiCtx = apiHits.length ? API_APPENDIX[docLang(state.doc)] + formatApisForContext(apiHits) : '';
-  const bot = bubble('bot', '…');
-  const btn = $('askBtn'); btn.disabled = true;
-  let acc = '';
-  const d = state.doc;
-  try {
-    for await (const tok of chatStream([
-      { role: 'system', content: sys(d) + ASK_SUFFIX[docLang(d)] + context + apiCtx },
-      ...history.slice(-6),
-      { role: 'user', content: q },
-    ])) { acc += tok; bot.innerHTML = md(acc); $('chat').scrollTop = $('chat').scrollHeight; }
-    let src = `<span class="src">${t('ask.sources', { list: hits.map(h => h.index + 1).join(', ') })}</span>`;
-    if (apiHits.length) src += `<span class="src">${t('ask.apis', { list: apiHits.map(a => esc(a.name)).join(', ') })}</span>`;
-    bot.innerHTML += src;
-    history.push({ role: 'user', content: q }, { role: 'assistant', content: acc });
-  } catch (err) { bot.textContent = errMsg(err); } finally { btn.disabled = false; }
-};
+function initOnboarding() {
+  document.querySelectorAll('#onboardDlg [data-ol]').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.ol === (obLang || lang())));
+    b.onclick = () => {
+      obLang = b.dataset.ol;
+      document.querySelectorAll('#onboardDlg [data-ol]').forEach(x =>
+        x.setAttribute('aria-pressed', String(x === b)));
+    };
+  });
+  $('onboardForm').addEventListener('submit', () => {
+    const name = $('onbName').value.trim();
+    if (name) state.settings.name = name;
+    if (obLang) setLang(obLang);
+    state.settings.onboarded = true;
+    save();
+    renderGreeting();
+  });
+}
 
 /* ── Boot ── */
 async function boot() {
   applyI18n();
+  renderGreeting();
   renderStats();
   renderAuth();
   initStudy();
   initTimer();
+  initOnboarding();
   updateEngineUI();
   await hydrateDoc();
   renderDoc();
@@ -465,6 +484,7 @@ async function boot() {
   await initAuth();
   caps = await probeCapabilities();
   void connect();
+  if (!state.settings.onboarded) $('onboardDlg').showModal();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 }
 void boot();

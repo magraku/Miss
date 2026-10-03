@@ -7,7 +7,7 @@ const LEGACY_KEY = 'sosiego:v1';
 const defaults = {
   xp: 0, streak: 0, lastDay: null,
   cards: [], sessions: [],
-  settings: { model: '', focusMin: 30, lang: 'en' },
+  settings: { model: '', focusMin: 30, lang: 'en', name: '' },
   library: [],   // [{id, name, lang, updatedAt, total, done}] course metadata
   doc: null,     // active course: { id, name, lang, current, done:[], summaries:{}, chunks:[] }
 };

@@ -15,6 +15,11 @@
 <!-- ═══ TOP BAR ═══ -->
 <nav class="topbar">
   <a class="brand" href="#" id="brandHome">MissPedia</a>
+  <div class="tabs topbar-tabs" id="topTabs" role="tablist" hidden>
+    <button role="tab" data-tab="summary" aria-selected="true" data-i18n="tab.summary">lesson</button>
+    <button role="tab" data-tab="cards" aria-selected="false" tabindex="-1" data-i18n="tab.cards">practice</button>
+    <button role="tab" data-tab="quiz" aria-selected="false" tabindex="-1" data-i18n="tab.quiz">challenge</button>
+  </div>
   <div class="topbar-actions">
     <button class="ghost-link" id="navLibrary" data-i18n="nav.library">my courses</button>
     <a class="ghost-link" id="navDonate" data-i18n="nav.donate" target="_blank" rel="noopener">donate</a>
@@ -33,7 +38,7 @@
   </div>
 
   <header class="home-header">
-    <p class="tagline" data-i18n="app.tagline">What are we learning today?</p>
+    <p class="tagline" id="homeTagline" data-i18n="app.tagline">What are we learning today?</p>
   </header>
 
   <div class="drop-ring-wrap">
@@ -101,66 +106,45 @@
   </header>
 
   <main class="study-layout">
-    <div class="deck-left">
-      <div class="deck-blob">
-        <img src="./assets/v2/deck-blob.png" alt="">
-        <h1>Data Deck</h1>
-      </div>
-      <section class="deck-textpanel" id="panel-summary" role="tabpanel">
-      <img src="./assets/v2/deck-textpanel.png" class="panel-bg" alt="" aria-hidden="true">
-        <div class="panel-content">
-          <button id="genSummary" class="ghost-link regen-link" data-i18n="summary.regen">regenerate</button>
-          <div id="summaryOut" class="prose"></div>
-          <div class="eval-box" id="evalBox" hidden>
-            <div id="evalFeedback" class="eval-feedback"></div>
-            <div class="eval-input-row">
-              <input id="evalInput" type="text" data-i18n-ph="eval.ph" placeholder="your answer, in your own words…" autocomplete="off">
-              <button class="pill-btn" id="evalBtn" data-i18n="eval.check">check</button>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div class="deck-blob" aria-hidden="true">
+      <img src="./assets/v2/deck-blob.png" alt="">
+      <h1>Data Deck</h1>
     </div>
 
-    <section class="deck-right">
-      <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="summary" aria-selected="true" data-i18n="tab.summary">lesson</button>
-        <button role="tab" data-tab="cards" aria-selected="false" tabindex="-1" data-i18n="tab.cards">practice</button>
-        <button role="tab" data-tab="quiz" aria-selected="false" tabindex="-1" data-i18n="tab.quiz">challenge</button>
-        <button role="tab" data-tab="ask" aria-selected="false" tabindex="-1" data-i18n="tab.ask">ask</button>
-      </nav>
-
-      <div class="workspace">
-        <div id="panel-cards" class="panel" role="tabpanel" hidden>
-          <div class="panelhead">
-            <h2 data-i18n="cards.title">retrieval practice</h2>
-            <button id="genCards" class="pill-btn" data-i18n="cards.regen">regenerate practice</button>
+    <section class="deck-textpanel" id="panel-summary" role="tabpanel">
+      <img src="./assets/v2/deck-textpanel.png" class="panel-bg" alt="" aria-hidden="true">
+      <div class="panel-content">
+        <button id="genSummary" class="ghost-link regen-link" data-i18n="summary.regen">regenerate</button>
+        <div id="summaryOut" class="prose"></div>
+        <div class="eval-box" id="evalBox" hidden>
+          <div id="evalFeedback" class="eval-feedback"></div>
+          <div class="eval-input-row">
+            <input id="evalInput" type="text" data-i18n-ph="eval.ph" placeholder="your answer, in your own words…" autocomplete="off">
+            <button class="pill-btn" id="evalBtn" data-i18n="eval.check">check</button>
           </div>
-          <p id="cardCount" class="hint-sm"></p>
-          <div id="cardStage" class="stage"></div>
-        </div>
-
-        <div id="panel-quiz" class="panel" role="tabpanel" hidden>
-          <div class="panelhead">
-            <h2 data-i18n="quiz.title">comprehension challenge</h2>
-            <button id="genQuiz" class="pill-btn" data-i18n="quiz.regen">regenerate challenge</button>
-          </div>
-          <div id="quizStage" class="stage"></div>
-        </div>
-
-        <div id="panel-ask" class="panel" role="tabpanel" hidden>
-          <h2 data-i18n="ask.title">ask</h2>
-          <p id="askDisabled" class="empty-msg" hidden data-i18n="ask.disabledMobile"></p>
-          <div id="chat" class="chat" aria-live="polite"></div>
-          <form id="askForm" class="askform">
-            <input id="askInput" type="text" data-i18n-ph="ask.ph" placeholder="type your question…" autocomplete="off">
-            <button class="pill-btn" type="submit" id="askBtn" data-i18n="ask.send">send</button>
-          </form>
         </div>
       </div>
-
-      <div class="deck-visual" id="deckVisual" aria-hidden="true"></div>
     </section>
+
+    <div class="workspace">
+      <div id="panel-cards" class="panel" role="tabpanel" hidden>
+        <div class="panelhead">
+          <h2 data-i18n="cards.title">retrieval practice</h2>
+          <button id="genCards" class="pill-btn" data-i18n="cards.regen">regenerate practice</button>
+        </div>
+        <p id="cardCount" class="hint-sm"></p>
+        <div id="cardStage" class="stage"></div>
+        <div class="deck-visual" id="deckVisual" aria-hidden="true"></div>
+      </div>
+
+      <div id="panel-quiz" class="panel" role="tabpanel" hidden>
+        <div class="panelhead">
+          <h2 data-i18n="quiz.title">comprehension challenge</h2>
+          <button id="genQuiz" class="pill-btn" data-i18n="quiz.regen">regenerate challenge</button>
+        </div>
+        <div id="quizStage" class="stage"></div>
+      </div>
+    </div>
 
     <div class="gen-overlay" id="genOverlay" hidden>
       <div class="gen-ring"></div>
@@ -240,6 +224,21 @@
       <button value="yes" class="pill-btn" data-i18n="timer.yes">nailed it</button>
       <button value="partly" class="ghost-link" data-i18n="timer.partly">partly</button>
       <button value="no" class="ghost-link" data-i18n="timer.no">no</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="onboardDlg">
+  <form method="dialog" class="auth-form" id="onboardForm">
+    <h2 data-i18n="onb.title">Welcome to MissPedia</h2>
+    <p data-i18n="onb.sub">Before we start — what should your tutor call you, and which language do you speak?</p>
+    <input id="onbName" type="text" maxlength="40" required data-i18n-ph="onb.name" placeholder="your first name">
+    <div class="lang-toggle onb-toggle" role="group" aria-label="Language">
+      <button type="button" data-ol="en">English</button>
+      <button type="button" data-ol="fr">Français</button>
+    </div>
+    <div class="reflect-controls">
+      <button class="pill-btn" id="onbStart" value="ok" data-i18n="onb.start">start learning</button>
     </div>
   </form>
 </dialog>

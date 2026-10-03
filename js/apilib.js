@@ -1,6 +1,6 @@
 // public-apis catalog (1966 free APIs, 51 categories) — vendored at data/apis.json.
-// Two uses: enrich generated lessons when the document's subject matches an API
-// domain, and answer "ask" questions about available APIs.
+// Used to enrich generated lessons when the document's subject matches an API
+// domain.
 import { tokens } from './docs.js';
 
 let cache = null;
@@ -29,11 +29,6 @@ function score(list, qTokens, limit) {
 export async function matchApis(chunks, limit = 8) {
   const sample = chunks.slice(0, 4).map(c => c.text).join(' ').slice(0, 12000);
   return score(await apis(), tokens(sample), limit);
-}
-
-// Search API by free-text query (ask tab).
-export async function searchApis(query, limit = 5) {
-  return score(await apis(), tokens(query), limit);
 }
 
 export function formatApisForContext(list) {

@@ -26,7 +26,7 @@ function cardImgUrl(c) {
   if (!c.img) return null;
   let seed = 0;
   for (const ch of c.id || c.front) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(c.img + ', flat vector illustration, soft warm palette, no text')}?width=480&height=300&nologo=true&seed=${seed % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(c.img + ', flat vector illustration, soft warm palette, no text')}?width=420&height=200&nologo=true&seed=${seed % 100000}`;
 }
 
 function tcgCard(c, { revealed = false } = {}) {
@@ -43,10 +43,12 @@ function tcgCard(c, { revealed = false } = {}) {
   </div>`;
 }
 
+const docCards = () => state.cards.filter(c => !state.doc || c.docId === state.doc.id);
+
 function renderDeckVisual() {
   const v = $('deckVisual');
   if (!v) return;
-  const cards = state.cards.slice(0, 6);
+  const cards = docCards().slice(0, 6);
   if (!cards.length) { v.innerHTML = ''; return; }
   v.innerHTML = cards.map((c, i) => `
     <div class="mini-card" style="--r:${(i - (cards.length - 1) / 2) * 5}deg; --y:${Math.abs(i - (cards.length - 1) / 2) * 4}px">
@@ -56,7 +58,7 @@ function renderDeckVisual() {
 }
 
 function buildQueue() {
-  queue = shuffle(state.cards.filter(c => c.due <= Date.now()));
+  queue = shuffle(docCards().filter(c => c.due <= Date.now()));
   renderCard();
   renderDeckVisual();
 }
@@ -65,8 +67,8 @@ function renderCard() {
   const stage = $('cardStage');
   if (!stage) return;
   const cc = $('cardCount');
-  if (cc) cc.textContent = t('cards.count', { total: state.cards.length, due: queue.length });
-  if (!state.cards.length) { stage.innerHTML = `<p class="empty-msg">${t('cards.none')}</p>`; return; }
+  if (cc) cc.textContent = t('cards.count', { total: docCards().length, due: queue.length });
+  if (!docCards().length) { stage.innerHTML = `<p class="empty-msg">${t('cards.none')}</p>`; return; }
   if (!queue.length) { stage.innerHTML = `<p class="empty-msg">${t('cards.allDone')}</p>`; return; }
   const c = queue[0];
   stage.innerHTML = tcgCard(c) + `

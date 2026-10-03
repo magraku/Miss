@@ -81,21 +81,4 @@ export function detectLang(text) {
   return fr > en ? 'fr' : 'en';
 }
 
-// TF-IDF-ish scoring: k most relevant chunks for a query.
-export function retrieve(chunks, query, k = 3) {
-  const q = [...new Set(tokens(query))];
-  if (!q.length || !chunks.length) return chunks.slice(0, k).map((c, i) => ({ index: i, chunk: c }));
-  const docs = chunks.map(c => tokens(c.text));
-  const df = {};
-  for (const d of docs) for (const w of new Set(d)) df[w] = (df[w] || 0) + 1;
-  const N = chunks.length;
-  const scored = docs.map((d, i) => {
-    const tf = {};
-    for (const w of d) tf[w] = (tf[w] || 0) + 1;
-    let s = 0;
-    for (const w of q) if (tf[w]) s += (1 + Math.log(tf[w])) * Math.log(1 + N / (1 + (df[w] || 0)));
-    return { index: i, chunk: chunks[i], score: s };
-  });
-  const top = scored.sort((a, b) => b.score - a.score).slice(0, k).filter(x => x.score > 0);
-  return top.length ? top : chunks.slice(0, k).map((c, i) => ({ index: i, chunk: c }));
-}
+

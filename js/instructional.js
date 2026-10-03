@@ -80,35 +80,45 @@ summary. Reply in Markdown, concisely:
 1. Title and goal of this first micro-lesson.
 2. One essential concept, briefly explained.
 3. A concrete example taken from the material.
-4. One open question that checks comprehension (the learner should answer
-   before moving on).
-5. The next unlockable step, without explaining its content yet.`,
+4. ONE single open question that checks comprehension — under a "Question"
+   heading. This is critical: the whole lesson must contain EXACTLY ONE
+   question. Ask nothing else anywhere — no rhetorical questions, no "can you
+   see why…?", no follow-up prompts. The learner unlocks the next step by
+   answering this one question.
+5. One line naming the next unlockable step, without explaining its content.`,
 
 fr: `Conçois la première leçon actionnable pour la section courante — pas un
 résumé passif. Réponds en Markdown, avec concision :
 1. Titre et objectif de cette première micro-leçon.
 2. Un concept essentiel, expliqué brièvement.
 3. Un exemple concret tiré du document.
-4. Une question ouverte qui vérifie la compréhension (l'apprenant doit y
-   répondre avant d'avancer).
-5. L'étape suivante à débloquer, sans en dévoiler le contenu.`,
+4. UNE SEULE question ouverte qui vérifie la compréhension — sous un titre
+   « Question ». C'est essentiel : la leçon entière ne doit contenir
+   EXACTEMENT QU'UNE question. Rien d'autre — pas de question rhétorique, pas
+   de « vois-tu pourquoi… ? », pas de relance. L'apprenant débloque l'étape
+   suivante en répondant à cette unique question.
+5. Une ligne nommant l'étape suivante à débloquer, sans en dévoiler le contenu.`,
 };
 
 export const CARDS_REQUEST = {
 en: `Create 5 to 8 study flashcards from this text, styled like collectible
 cards: each card is ONE key concept. Fields: "title" (2-4 word card name),
 "front" (a question requiring recall or explanation — never yes/no), "back"
-(short, precise answer), "img" (a 5-10 word English visual prompt describing an
-illustration of this concept — concrete scene or object, no text in image).
+(an informative answer of 1-3 sentences with the key facts — enough to learn
+from the card alone), "img" (a 5-10 word English visual prompt that illustrates
+THIS card's specific concept: name the concrete objects, scene or diagram that
+represent it — never a generic study image, no text in image).
 
 TEXT:
 `,
 fr: `Crée 5 à 8 cartes de révision à partir de ce texte, dans le style des
 cartes à collectionner : chaque carte = UN concept clé. Champs : "title" (nom
 de carte en 2-4 mots), "front" (question obligeant à se souvenir ou expliquer —
-jamais de oui/non), "back" (réponse courte et précise), "img" (prompt visuel en
-anglais de 5-10 mots décrivant une illustration du concept — scène ou objet
-concret, pas de texte dans l'image).
+jamais de oui/non), "back" (réponse informative de 1-3 phrases avec les faits
+clés — assez pour apprendre avec la carte seule), "img" (prompt visuel en
+anglais de 5-10 mots qui illustre le concept précis de CETTE carte : nomme les
+objets, la scène ou le schéma qui le représentent — jamais d'image générique,
+pas de texte dans l'image).
 
 TEXTE :
 `,
@@ -132,22 +142,18 @@ TEXTE :
 `,
 };
 
-export const ASK_SUFFIX = {
-en: ' Answer using the CONTEXT only. If it does not contain the answer, say so clearly.\n\nCONTEXT:\n',
-fr: ' Réponds uniquement avec le CONTEXTE. S\'il ne contient pas la réponse, dis-le clairement.\n\nCONTEXTE :\n',
-};
-
 export const EVAL_REQUEST = {
 en: `Evaluate the learner's answer to the lesson's question. Judge the MEANING,
 not the wording. Reply as JSON: {"verdict": "mastered"|"partial"|"not",
 "feedback": "1-3 sentences: what was right, what to review if partial, or a new
-angle if not — always kind", "followup": "optional new question if verdict is
-not mastered"}`,
+angle if not — always kind, never a question", "followup": "exactly ONE new
+question, only when verdict is not mastered — otherwise an empty string"}`,
 fr: `Évalue la réponse de l'apprenant à la question de la leçon. Juge le SENS,
 pas la formulation. Réponds en JSON : {"verdict": "mastered"|"partial"|"not",
 "feedback": "1-3 phrases : ce qui était juste, quoi revoir si partiel, ou un
-nouvel angle si faux — toujours bienveillant", "followup": "nouvelle question
-optionnelle si le verdict n'est pas mastered"}`,
+nouvel angle si faux — toujours bienveillant, jamais de question", "followup":
+"exactement UNE nouvelle question, seulement si le verdict n'est pas mastered —
+sinon une chaîne vide"}`,
 };
 
 const EVAL_SCHEMA = {

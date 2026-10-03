@@ -46,6 +46,10 @@ img { display: block; max-width: 100%; }
   text-decoration: none; letter-spacing: 0.02em; cursor: pointer;
 }
 .topbar-actions { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-tabs {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 0.4rem; margin-bottom: 0;
+}
 .lang-toggle { display: flex; border: 1px solid var(--ink-faint); border-radius: var(--radius-pill); overflow: hidden; }
 .lang-toggle button { padding: 0.2rem 0.6rem; font-size: 0.72rem; color: var(--ink-muted); }
 .lang-toggle button[aria-pressed="true"] { background: var(--pink); color: #fff; }
@@ -179,10 +183,7 @@ img { display: block; max-width: 100%; }
 .deck-sq-tl { top: -4%; left: -6%; width: 30vw; }
 .deck-sq-br { bottom: -8%; right: -4%; width: 34vw; }
 
-.deck-left { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.study-layout.wide .deck-left { display: none; }
-.study-layout.wide { grid-template-columns: 1fr; }
-.deck-blob { position: relative; width: min(300px, 24vw); margin-bottom: -0.4rem; }
+.deck-blob { position: fixed; top: 10vh; left: 2.5vw; z-index: 1; width: min(240px, 18vw); pointer-events: none; }
 .deck-blob img { width: 100%; }
 .deck-blob h1 {
   position: absolute; top: 42%; left: 50%; transform: translate(-50%,-50%);
@@ -202,12 +203,12 @@ img { display: block; max-width: 100%; }
 
 .study-layout {
   position: relative; z-index: 2; flex: 1;
-  display: grid; grid-template-columns: minmax(340px, 44%) 1fr; gap: 2vw;
-  padding: 2vh 4vw 0; align-items: stretch; min-height: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2vh 4vw 0; min-height: 0;
 }
 
-/* Left: the organic text panel (lesson) */
-.deck-textpanel { position: relative; min-height: 0; flex: 1; }
+/* Centered: the organic text panel (lesson) */
+.deck-textpanel { position: relative; min-height: 0; flex: 1; width: min(780px, 96%); }
 .deck-textpanel .panel-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
 .deck-textpanel .panel-content {
   position: absolute; inset: 14% 16% 18% 16%;
@@ -215,8 +216,11 @@ img { display: block; max-width: 100%; }
 }
 .regen-link { float: right; font-size: 0.72rem; }
 
-/* Right: tabs + workspace + cards visual */
-.deck-right { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+/* Workspace: practice + challenge panels, centered */
+.workspace {
+  flex: 1; min-height: 0; overflow-y: auto;
+  width: min(860px, 96%); margin: 0 auto; padding-bottom: 9rem;
+}
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
 .tabs [role=tab] {
   font-size: 0.8rem; color: var(--ink-muted); cursor: pointer;
@@ -229,9 +233,6 @@ img { display: block; max-width: 100%; }
 .panel h2 { font-family: var(--font-serif); font-weight: 500; font-size: 1.3rem; margin-bottom: 0.4rem; }
 .panelhead { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.6rem; }
 .stage { max-width: 68ch; padding-bottom: 2rem; }
-
-.deck-cards-visual { max-width: 340px; margin-left: auto; pointer-events: none; }
-.deck-cards-visual img { width: 100%; }
 
 /* Footer: section nav + Got it */
 .deck-foot {
@@ -249,6 +250,7 @@ img { display: block; max-width: 100%; }
 }
 .deck-next:hover:not(:disabled) { transform: translateY(-2px) scale(1.02); }
 .deck-next:disabled { opacity: 0.4; cursor: default; }
+.deck-next.locked { filter: grayscale(0.35); font-style: normal; font-size: 0.95rem; }
 
 /* Focus panel — floating bottom-left, collapsible */
 .focus-panel {
@@ -299,7 +301,7 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 }
 .tcg-title { font-family: var(--font-serif); font-weight: 500; font-size: 1.05rem; }
 .tcg-box { font-size: 0.68rem; background: rgba(255,255,255,0.25); padding: 0.1rem 0.55rem; border-radius: 99px; }
-.tcg-art { height: 170px; background: var(--pink-faint); overflow: hidden; }
+.tcg-art { height: 108px; background: var(--pink-faint); overflow: hidden; }
 .tcg-art img { width: 100%; height: 100%; object-fit: cover; }
 .tcg-art.no-img { display: none; }
 .tcg-art.no-img + .tcg-body { border-top: none; }
@@ -309,21 +311,21 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 .tcg-ans { margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px dashed var(--ink-faint); color: var(--ink); }
 .tcg-ans.hidden { display: none; }
 
-/* Mini deck preview — stacked generated cards on the right */
+/* Mini deck preview — the learner's card collection, inside the practice tab */
 .deck-visual {
-  position: relative; display: flex; align-items: flex-end; gap: 0;
-  height: 190px; margin-top: auto; padding: 0 1rem;
+  position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 0;
+  height: 160px; margin-top: 2rem; padding: 0 1rem;
 }
 .mini-card {
-  width: 96px; height: 128px; border-radius: 10px; overflow: hidden;
+  width: 84px; height: 112px; border-radius: 10px; overflow: hidden;
   border: 2px solid var(--gold); background: var(--paper-soft);
   transform: rotate(var(--r, 0deg)) translateY(var(--y, 0));
-  margin-left: -28px; box-shadow: 0 6px 16px rgba(60,56,53,0.15);
+  margin-left: -24px; box-shadow: 0 6px 16px rgba(60,56,53,0.15);
   display: flex; flex-direction: column; transition: transform 0.2s;
 }
 .mini-card:first-child { margin-left: 0; }
 .mini-card:hover { transform: translateY(-10px); z-index: 2; }
-.mini-card img { width: 100%; height: 86px; object-fit: cover; }
+.mini-card img { width: 100%; height: 62px; object-fit: cover; }
 .mini-card span { font-size: 0.6rem; padding: 0.2rem 0.4rem; color: var(--ink); text-align: center; }
 
 /* Evaluator box under each lesson */
@@ -348,17 +350,6 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 .feedback { font-size: 0.85rem; color: var(--ink-muted); margin-bottom: 0.8rem; }
 .progressbar { height: 3px; background: var(--ink-faint); border-radius: 3px; overflow: hidden; margin-bottom: 1rem; }
 .progressbar span { display: block; height: 100%; background: var(--pink); transition: width 0.3s; }
-
-.chat { display: flex; flex-direction: column; gap: 0.6rem; margin: 0.8rem 0 1rem; max-height: 46vh; overflow-y: auto; }
-.msg { padding: 0.7rem 1rem; border-radius: 14px; max-width: 66ch; font-size: 0.88rem; line-height: 1.6; }
-.msg.user { background: var(--pink-faint); border: 1px solid var(--pink-soft); align-self: flex-end; }
-.msg.bot { background: var(--paper-soft); border: 1px solid var(--ink-faint); align-self: flex-start; }
-.msg .src { display: block; color: var(--ink-muted); font-size: 0.72rem; margin-top: 0.4rem; }
-.askform { display: flex; gap: 0.6rem; }
-.askform input {
-  flex: 1; border: 1px solid var(--ink-faint); border-radius: var(--radius-pill);
-  padding: 0.55rem 1.1rem; font-size: 0.85rem; background: var(--paper-soft); color: var(--ink);
-}
 
 /* Generation overlay — blocks the course until AI output exists */
 .gen-overlay {
@@ -390,6 +381,10 @@ dialog p { color: var(--ink-muted); font-size: 0.86rem; margin-bottom: 1rem; }
 }
 .reflect-controls { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
 
+/* Onboarding */
+.onb-toggle { display: inline-flex; margin-bottom: 1.2rem; }
+.onb-toggle button { padding: 0.35rem 0.9rem; font-size: 0.8rem; cursor: pointer; }
+
 #toast {
   position: fixed; bottom: 1.4rem; left: 50%; transform: translate(-50%, 10px);
   background: var(--ink); color: var(--paper); font-size: 0.82rem;
@@ -408,14 +403,16 @@ dialog p { color: var(--ink-muted); font-size: 0.86rem; margin-bottom: 1rem; }
   .ready-ring-wrap { position: fixed; right: 5%; bottom: 10%; }
   .engine-status { position: fixed; bottom: 2%; }
   .paste-toggle-wrap { bottom: 6%; }
-  .study-layout { grid-template-columns: 1fr; padding: 1rem 5vw 6rem; display: flex; flex-direction: column; }
-  .deck-blob { position: relative; top: auto; left: auto; margin: 0 0 1rem; width: 200px; }
+  .topbar { flex-wrap: wrap; }
+  .topbar-tabs { position: static; transform: none; order: 3; width: 100%; justify-content: center; margin-top: 0.3rem; }
+  .view-study { padding-top: 100px; }
+  .study-layout { padding: 1rem 5vw 6rem; }
+  .deck-blob { display: none; }
   .deck-textpanel { min-height: 40vh; }
   .deck-textpanel .panel-content { inset: 10% 12%; }
-  .deck-cards-visual { display: none; }
+  .deck-visual { display: none; }
   .deck-foot { position: fixed; bottom: 0; left: 0; right: 0; transform: none;
     background: var(--paper); padding: 0.7rem 1rem; justify-content: space-between; border-top: 1px solid var(--ink-faint); }
   .focus-panel { bottom: 4.4rem; }
-  .chat { max-height: 40vh; }
   .topbar-actions { gap: 0.6rem; }
 }
