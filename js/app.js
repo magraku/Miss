@@ -4,12 +4,12 @@ import { connect, chatStream, engineState, onEngineChange, probeCapabilities, wh
 import { extractPdf, chunkPages, chunkPlain, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
 import { t, setLang, applyI18n, lang } from './i18n.js';
-import { sys, FIRST_LESSON_REQUEST, API_APPENDIX, docLang, EVAL_REQUEST, EVAL_SCHEMA } from './instructional.js';
+import { sys, FIRST_LESSON_REQUEST, API_APPENDIX, docLang, EVAL_REQUEST, EVAL_SCHEMA, HINT_REQUEST } from './instructional.js';
 import { chatJSON } from './llm.js';
 import { matchApis, formatApisForContext } from './apilib.js';
 import { initAuth, signIn, signOut, auth, authEnabled, deleteRemote } from './sync.js';
 import { CONFIG } from './config.js';
-import { initStudy, generateLearningTools } from './study.js';
+import { initStudy, genCards, genQuiz } from './study.js';
 import { initTimer } from './timer.js';
 import { getCourse } from './db.js';
 
@@ -70,6 +70,10 @@ function updateEngineUI() {
       (caps.canGenerate ? '' : t('home.noWebgpu'));
     retry.hidden = engineState.status !== 'error';
   }
+  // Mirror download progress into the generation overlay when it's open.
+  const go = $('genOverlay');
+  if (go && !go.hidden && (engineState.status === 'downloading' || engineState.status === 'loading'))
+    setGenProgress(engineState.progress, engineState.message);
   renderDoc(); // next-section lock depends on whether the AI can evaluate answers
 }
 onEngineChange(updateEngineUI);
@@ -169,7 +173,7 @@ async function openCourse(id) {
   if (!p || !p.chunks?.length) { toast(t('lib.empty')); return; }
   state.doc = {
     id, name: p.name, lang: p.lang || 'en',
-    chunks: p.chunks, summaries: p.summaries || {},
+    chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {},
     current: p.current ?? 0, done: p.done || [],
     apis: p.apis || [],
   };
@@ -249,7 +253,7 @@ async function loadDoc(name, chunks) {
   const dLang = detectLang(text) || 'en';
   state.doc = {
     id: crypto.randomUUID(), name, lang: dLang,
-    chunks, current: 0, done: [], summaries: {},
+    chunks, current: 0, done: [], summaries: {}, questions: {},
   };
   await persistDoc();
   upsertLibrary({ id: state.doc.id, name, lang: dLang, updatedAt: Date.now(), total: chunks.length, done: 0 });
@@ -330,7 +334,12 @@ async function genSummary({ automatic = false } = {}) {
       { role: 'user', content: `${FIRST_LESSON_REQUEST[docLang(d)]}${learner()}\n\n${docLang(d) === 'fr' ? 'MATÉRIAU DE LA SECTION' : 'SECTION MATERIAL'}:\n${ch.text}${apiBlock}` },
     ])) { acc += t_; out.innerHTML = md(acc); }
     if (!acc.trim()) throw new Error(t('err.notJson'));
-    state.doc.summaries[idx] = acc; save(); await persistDoc();
+    state.doc.summaries[idx] = acc;
+    // The check question is extracted once and frozen: retries, feedback and
+    // hints always refer to THIS question — it never changes.
+    d.questions = d.questions || {};
+    d.questions[idx] = extractQuestion(acc) || t('eval.defaultQ');
+    save(); await persistDoc();
     renderEvalBox();
     return acc;
   } catch (e) { toast(errMsg(e)); } finally { busy(genSummaryBtn, false); }
@@ -338,6 +347,18 @@ async function genSummary({ automatic = false } = {}) {
 if (genSummaryBtn) genSummaryBtn.onclick = () => { void genSummary(); };
 
 /* ── Evaluator (Maria's loop: no progress without comprehension) ── */
+// Pull the single check question out of the generated lesson. The prompt
+// requires it under a "Question" heading; fall back to the last '?'-line.
+function extractQuestion(lesson) {
+  const m = lesson.match(/^#{1,4}[^\n]*\bquestions?\b[^\n]*$/im);
+  if (m) {
+    const block = lesson.slice(m.index + m[0].length).trim().split(/\n\s*\n|^#{1,4}/m)[0].trim();
+    if (block) return block;
+  }
+  const marks = lesson.match(/[^\n?][^\n]*\?[^\n]*/g);
+  return marks ? marks[marks.length - 1].trim() : '';
+}
+
 let evalFor = null; // "docId:section" the eval box currently belongs to
 function renderEvalBox() {
   const box = $('evalBox');
@@ -346,9 +367,20 @@ function renderEvalBox() {
   const key = d ? `${d.id}:${d.current}` : null;
   const hasLesson = !!(d && d.summaries?.[d.current]);
   box.hidden = !(hasLesson && engineState.status === 'ready');
+  // Backfill for lessons generated before questions were stored separately.
+  let q = d?.questions?.[d.current];
+  if (!q && hasLesson) {
+    q = extractQuestion(d.summaries[d.current]) || t('eval.defaultQ');
+    d.questions = d.questions || {};
+    d.questions[d.current] = q;
+    void persistDoc();
+  }
+  const qEl = $('evalQuestion');
+  if (qEl) qEl.innerHTML = q ? md(q) : '';
   if (key !== evalFor) { // only reset the conversation when the section changes
     evalFor = key;
     $('evalFeedback').innerHTML = '';
+    $('evalHint').innerHTML = '';
     $('evalInput').value = '';
   }
 }
@@ -368,7 +400,11 @@ async function evaluateAnswer() {
     ], EVAL_SCHEMA);
     const fb = $('evalFeedback');
     const cls = r.verdict === 'mastered' ? 'eval-good' : r.verdict === 'partial' ? 'eval-mid' : 'eval-bad';
-    fb.innerHTML = `<div class="eval-msg ${cls}">${md(r.feedback)}${r.verdict !== 'mastered' && r.followup ? `<p class="eval-follow">${esc(r.followup)}</p>` : ''}</div>`;
+    fb.innerHTML = `<div class="eval-msg ${cls}">${md(r.feedback)}</div>`;
+    if (r.verdict !== 'mastered') {
+      // The question never changes — the learner simply tries it again.
+      fb.innerHTML += `<p class="eval-follow">${t('eval.retry')}</p>`;
+    }
     if (r.verdict === 'mastered') {
       addXP(8);
       fb.innerHTML += `<p class="eval-mastered">${t('eval.mastered')}</p>`;
@@ -386,6 +422,23 @@ async function evaluateAnswer() {
 $('evalBtn').onclick = evaluateAnswer;
 $('evalInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); void evaluateAnswer(); } });
 
+// Hint: rephrase or nudge on the SAME question — never a new one.
+$('evalHintBtn').onclick = async () => {
+  const d = state.doc, ch = chunk(), q = d?.questions?.[d.current];
+  if (!d || !ch || !q) return;
+  const btn = $('evalHintBtn'); busy(btn, true, t('eval.thinking'));
+  const p = document.createElement('p');
+  p.className = 'eval-hint-item';
+  $('evalHint').appendChild(p);
+  let acc = '';
+  try {
+    for await (const tok of chatStream([
+      { role: 'system', content: sys(d) },
+      { role: 'user', content: `${HINT_REQUEST[docLang(d)]}\n\nQUESTION: ${q}\n\nLESSON MATERIAL:\n${ch.text}` },
+    ])) { acc += tok; p.innerHTML = md(acc); }
+  } catch (e) { p.remove(); toast(errMsg(e)); } finally { busy(btn, false); }
+};
+
 // Auto-generate lesson when entering a section that has none.
 async function maybeGenerateForSection() {
   if (!state.doc || state.doc.summaries?.[state.doc.current]) return;
@@ -394,10 +447,18 @@ async function maybeGenerateForSection() {
 }
 
 /* ── Ready → study ── */
-const genOverlay = $('genOverlay'), genHint = $('genHint'), genBack = $('genBack');
+const genOverlay = $('genOverlay'), genHint = $('genHint'), genBack = $('genBack'),
+      genBar = $('genBar'), genFill = $('genFill');
+function setGenProgress(frac, label) {
+  if (!genBar) return;
+  genBar.hidden = false;
+  genFill.style.width = `${Math.round(Math.min(1, Math.max(0, frac)) * 100)}%`;
+  if (label) genHint.textContent = label;
+}
 function showGenOverlay(on, errMsg_) {
   genOverlay.hidden = !on;
   genBack.hidden = !errMsg_;
+  if (on) { genBar.hidden = true; genFill.style.width = '0%'; }
   if (errMsg_) genHint.textContent = errMsg_;
   else genHint.textContent = t('gen.hint');
 }
@@ -422,10 +483,16 @@ async function launchLearningExperience() {
       void connect(); // start/resume if idle
       await whenEngineReady();
     }
-    const results = await Promise.allSettled([
+    const steps = [
       genSummary({ automatic: true }),
-      generateLearningTools(),
-    ]);
+      genCards({ automatic: true }),
+      genQuiz({ automatic: true }),
+    ];
+    let done = 0;
+    const total = steps.length;
+    const results = await Promise.allSettled(steps.map(p => Promise.resolve(p)
+      .then(v => { done++; setGenProgress(done / total, t('gen.step', { done, total })); return v; },
+            e => { done++; setGenProgress(done / total, t('gen.step', { done, total })); throw e; })));
     if (launch !== learningLaunch) return;
     showGenOverlay(false);
     if (results.some(r => r.status === 'fulfilled')) toast(t('toast.ready'));

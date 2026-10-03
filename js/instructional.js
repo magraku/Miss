@@ -146,14 +146,23 @@ export const EVAL_REQUEST = {
 en: `Evaluate the learner's answer to the lesson's question. Judge the MEANING,
 not the wording. Reply as JSON: {"verdict": "mastered"|"partial"|"not",
 "feedback": "1-3 sentences: what was right, what to review if partial, or a new
-angle if not — always kind, never a question", "followup": "exactly ONE new
-question, only when verdict is not mastered — otherwise an empty string"}`,
+angle if not — always kind. NEVER ask a question yourself: the learner retries
+the SAME question, which never changes."}`,
 fr: `Évalue la réponse de l'apprenant à la question de la leçon. Juge le SENS,
 pas la formulation. Réponds en JSON : {"verdict": "mastered"|"partial"|"not",
 "feedback": "1-3 phrases : ce qui était juste, quoi revoir si partiel, ou un
-nouvel angle si faux — toujours bienveillant, jamais de question", "followup":
-"exactement UNE nouvelle question, seulement si le verdict n'est pas mastered —
-sinon une chaîne vide"}`,
+nouvel angle si faux — toujours bienveillant. Ne pose JAMAIS de question : la
+question reste la MÊME, l'apprenant réessaie."}`,
+};
+
+export const HINT_REQUEST = {
+en: `The learner is stuck on the lesson's comprehension question. Give ONE
+short hint or a simpler rephrasing that helps them think — never reveal the
+answer, never change the question's substance, 1-2 sentences.`,
+fr: `L'apprenant·e est bloqué·e sur la question de compréhension de la leçon.
+Donne UN indice court ou une reformulation plus simple qui l'aide à réfléchir —
+ne révèle jamais la réponse, ne change jamais le fond de la question,
+1-2 phrases.`,
 };
 
 const EVAL_SCHEMA = {
@@ -161,7 +170,6 @@ const EVAL_SCHEMA = {
   properties: {
     verdict: { type: 'string', enum: ['mastered', 'partial', 'not'] },
     feedback: { type: 'string' },
-    followup: { type: 'string' },
   },
   required: ['verdict', 'feedback'],
 };

@@ -52,7 +52,7 @@ async function pushActive() {
     name: d.name,
     lang: d.lang || 'en',
     payload: {
-      chunks: d.chunks, summaries: d.summaries,
+      chunks: d.chunks, summaries: d.summaries, questions: d.questions || {},
       current: d.current, done: d.done, apis: d.apis || [],
       cards: state.cards.filter(c => c.docId === d.id),
     },

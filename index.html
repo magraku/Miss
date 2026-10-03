@@ -117,10 +117,14 @@
         <button id="genSummary" class="ghost-link regen-link" data-i18n="summary.regen">regenerate</button>
         <div id="summaryOut" class="prose"></div>
         <div class="eval-box" id="evalBox" hidden>
+          <div class="eval-q-label" data-i18n="eval.qLabel">your question — same one until mastered</div>
+          <div class="eval-question" id="evalQuestion"></div>
+          <div id="evalHint" class="eval-hint"></div>
           <div id="evalFeedback" class="eval-feedback"></div>
           <div class="eval-input-row">
             <input id="evalInput" type="text" data-i18n-ph="eval.ph" placeholder="your answer, in your own words…" autocomplete="off">
             <button class="pill-btn" id="evalBtn" data-i18n="eval.check">check</button>
+            <button class="ghost-link" id="evalHintBtn" data-i18n="eval.hint">hint</button>
           </div>
         </div>
       </div>
@@ -149,6 +153,7 @@
     <div class="gen-overlay" id="genOverlay" hidden>
       <div class="gen-ring"></div>
       <p class="gen-title" data-i18n="gen.title">Your AI is preparing the course…</p>
+      <div class="engine-bar gen-bar" id="genBar" hidden><span id="genFill"></span></div>
       <p class="gen-hint" id="genHint" data-i18n="gen.hint">first time can take a couple of minutes</p>
       <button class="ghost-link" id="genBack" data-i18n="gen.back" hidden>← back to home</button>
     </div>

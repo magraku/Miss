@@ -330,6 +330,12 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 
 /* Evaluator box under each lesson */
 .eval-box { margin-top: 1.4rem; border-top: 1px dashed var(--ink-faint); padding-top: 1rem; }
+.eval-q-label { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 0.3rem; }
+.eval-question { font-family: var(--font-serif); font-size: 1.08rem; font-weight: 500; margin-bottom: 0.6rem; }
+.eval-question p { margin: 0; }
+.eval-hint-item { font-size: 0.85rem; color: var(--ink-muted); font-style: italic; border-left: 3px solid var(--gold); padding-left: 0.6rem; margin-bottom: 0.4rem; }
+.eval-hint-item p { margin: 0; }
+.eval-input-row .ghost-link { white-space: nowrap; }
 .eval-input-row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 .eval-input-row input {
   flex: 1; border: 1px solid var(--ink-faint); border-radius: var(--radius-pill);
@@ -365,6 +371,7 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .gen-title { font-family: var(--font-serif); font-style: italic; font-size: 1.6rem; }
 .gen-hint { color: var(--ink-muted); font-size: 0.85rem; max-width: 40ch; text-align: center; }
+.gen-bar { margin: 0.2rem 0; }
 
 /* ═══ Dialogs / toast ═══ */
 dialog {

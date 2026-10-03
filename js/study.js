@@ -189,17 +189,6 @@ export async function genQuiz({ automatic = false } = {}) {
   } catch (e) { toast(errMsg(e)); } finally { busy(btn, false); }
 }
 
-export async function generateLearningTools() {
-  const [cards, quizResult] = await Promise.allSettled([
-    genCards({ automatic: true }),
-    genQuiz({ automatic: true }),
-  ]);
-  return {
-    cards: cards.status === 'fulfilled' ? cards.value : 0,
-    quiz: quizResult.status === 'fulfilled' ? quizResult.value : 0,
-  };
-}
-
 export function initStudy() {
   const gc = $('genCards'), gq = $('genQuiz');
   if (gc) gc.onclick = () => genCards();

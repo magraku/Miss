@@ -38,6 +38,7 @@ export async function persistDoc() {
   await putCourse(state.doc.id, {
     name: state.doc.name, lang: state.doc.lang,
     chunks: state.doc.chunks, summaries: state.doc.summaries,
+    questions: state.doc.questions || {},
     current: state.doc.current, done: state.doc.done,
     apis: state.doc.apis || [],
   });
@@ -47,7 +48,7 @@ export async function hydrateDoc() {
   if (!state.doc || !state.doc.id) return;
   if (Array.isArray(state.doc.chunks) && state.doc.chunks.length) return;
   const p = await getCourse(state.doc.id);
-  if (p) Object.assign(state.doc, { chunks: p.chunks || [], summaries: p.summaries || {}, current: p.current ?? 0, done: p.done || [] });
+  if (p) Object.assign(state.doc, { chunks: p.chunks || [], summaries: p.summaries || {}, questions: p.questions || {}, current: p.current ?? 0, done: p.done || [] });
 }
 
 export function upsertLibrary(meta) {
