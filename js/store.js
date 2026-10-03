@@ -92,6 +92,19 @@ export function notifyDoc() {
   bus.dispatchEvent(new Event('doc'));
 }
 
+// Mark the current section mastered — single path for lesson eval AND quiz
+// pass, so done-list, library metadata and sync all stay consistent.
+// Returns true when the section was newly marked (false if already done).
+export function markSectionDone() {
+  const d = state.doc;
+  if (!d || (d.done || []).includes(d.current)) return false;
+  d.done.push(d.current);
+  const meta = state.library.find(c => c.id === d.id);
+  if (meta) upsertLibrary({ ...meta, done: d.done.length, updatedAt: Date.now() });
+  notifyDoc();
+  return true;
+}
+
 export function todaySessions() {
   return state.sessions.filter(s => s.day === day());
 }

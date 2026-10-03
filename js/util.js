@@ -37,6 +37,9 @@ const TEX_CMD = {
 const SUB = { '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','(':'₍',')':'₎','=':'₌' };
 const SUP = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ' };
 const toScript = (t, map) => [...t].map(c => map[c] ?? c).join('');
+// "$5 and a $10 menu" is money, not math — only texify when the content looks
+// like TeX (markers or no spaces at all), so prices survive untouched.
+const looksTex = s => /[_^\\={}]/.test(s) || !/\s/.test(s.trim());
 function texify(s) {
   return s
     .replace(/\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (_, a, b) => `${a}⁄${b}`)
@@ -51,8 +54,8 @@ export function md(text) {
   const lines = esc(text).split('\n');
   let html = '', list = null;
   const inline = s => s
-    .replace(/\\\(([^)]*?)\\\)|\\\[([\s\S]*?)\\\]/g, (m, a, b) => texify(a ?? b))
-    .replace(/\$([^$]+)\$/g, (m, inner) => texify(inner))
+    .replace(/\\\(([^)]*?)\\\)|\\\[([\s\S]*?)\\\]/g, (m, a, b) => looksTex(a ?? b) ? texify(a ?? b) : m)
+    .replace(/\$([^$]+)\$/g, (m, inner) => looksTex(inner) ? texify(inner) : m)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1<em>$2</em>')
     .replace(/`(.+?)`/g, '<code>$1</code>');

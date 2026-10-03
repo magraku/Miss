@@ -1,5 +1,5 @@
 // MissPedia — main controller. Views: home / library / study (Data Deck).
-import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse, addXP } from './store.js';
+import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse, addXP, markSectionDone } from './store.js';
 import { connect, chatStream, engineState, onEngineChange, probeCapabilities, whenEngineReady } from './llm.js';
 import { extractPdf, chunkPages, chunkPlain, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
@@ -101,6 +101,8 @@ function renderAuth() {
   if (syncEl) syncEl.textContent = auth.user ? t('lib.synced') : t('lib.local');
 }
 bus.addEventListener('auth', renderAuth);
+bus.addEventListener('lang', renderAuth);
+bus.addEventListener('lang', renderStats);
 
 $('navAuth').onclick = () => {
   const dlg = $('authDlg');
@@ -209,8 +211,9 @@ async function handleFile(file) {
   $('docStatus').textContent = '';
   try {
     // Only pdf/txt/md — the accept attribute is a hint, not a validation.
+    // text/* would also let .csv/.html through (B12).
     const okType = /\.(pdf|txt|md|markdown)$/i.test(file.name) ||
-      file.type === 'application/pdf' || file.type.startsWith('text/');
+      file.type === 'application/pdf' || file.type === 'text/plain' || file.type === 'text/markdown';
     if (!okType) throw new Error(t('home.badType'));
     let chunks;
     if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
@@ -228,8 +231,12 @@ async function handleFile(file) {
     dropHint.textContent = t('home.sections', { n: chunks.length });
     updateReadyBtn();
   } catch (err) {
-    dropLabel.textContent = t('home.drop');
-    dropHint.textContent = t('home.dropHint');
+    // Rejection keeps the previously loaded doc active — say so explicitly
+    // instead of showing an empty ring while "ready!" opens it.
+    dropRing.classList.toggle('has-file', !!state.doc);
+    dropLabel.textContent = state.doc ? state.doc.name : t('home.drop');
+    dropHint.textContent = state.doc ? t('home.stillLoaded') : t('home.dropHint');
+    updateReadyBtn();
     toast(errMsg(err));
   }
 }
@@ -417,13 +424,7 @@ async function evaluateAnswer() {
       addXP(8);
       fb.innerHTML += `<p class="eval-mastered">${t('eval.mastered')}</p>`;
       $('evalInput').value = '';
-      if (!d.done.includes(d.current)) {
-        d.done.push(d.current);
-        const meta = state.library.find(c => c.id === d.id);
-        if (meta) upsertLibrary({ ...meta, done: d.done.length, updatedAt: Date.now() });
-        notifyDoc();
-        void persistDoc();
-      }
+      if (markSectionDone()) void persistDoc();
     }
   } catch (e) { toast(errMsg(e)); } finally { busy(btn, false); }
 }
