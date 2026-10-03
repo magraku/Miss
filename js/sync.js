@@ -45,7 +45,7 @@ bus.addEventListener('doc', () => { if (auth.user) pushDebounced(); });
 
 async function pushActive() {
   const d = state.doc;
-  if (!sb || !auth.user || !d) return;
+  if (!sb || !auth.user || !d || !d.chunks?.length) return; // never push a chunk-less doc
   await sb.from('courses').upsert({
     user_id: auth.user.id,
     doc_key: d.id,
@@ -74,6 +74,15 @@ export async function pullAll() {
       total: (p.chunks || []).length, done: (p.done || []).length,
     });
     await putCourse(row.doc_key, { name: row.name, lang: row.lang, ...p }); // cache body locally
+    // If the active course lost its local body (e.g. corrupted write), heal it
+    // from the remote payload we just pulled.
+    if (state.doc?.id === row.doc_key && !state.doc.chunks?.length && p.chunks?.length) {
+      Object.assign(state.doc, {
+        chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {},
+        current: p.current ?? 0, done: p.done || [],
+      });
+      bus.dispatchEvent(new Event('doc'));
+    }
     if (p.cards?.length) {
       const known = new Set(state.cards.map(c => c.id));
       state.cards.push(...p.cards.filter(c => !known.has(c.id)));

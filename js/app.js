@@ -170,7 +170,7 @@ bus.addEventListener('lib', renderLibrary);
 
 async function openCourse(id) {
   const p = await getCourse(id);
-  if (!p || !p.chunks?.length) { toast(t('lib.empty')); return; }
+  if (!p || !p.chunks?.length) { toast(p ? t('lib.bodyMissing') : t('lib.empty')); return; }
   state.doc = {
     id, name: p.name, lang: p.lang || 'en',
     chunks: p.chunks, summaries: p.summaries || {}, questions: p.questions || {},
@@ -391,7 +391,8 @@ async function evaluateAnswer() {
   const d = state.doc;
   const answer = $('evalInput').value.trim();
   const ch = chunk();
-  if (!answer || !ch) return;
+  if (!ch) return toast(t('summary.needDoc'));
+  if (!answer) return;
   const btn = $('evalBtn'); busy(btn, true, t('eval.thinking'));
   try {
     const r = await chatJSON([
@@ -425,7 +426,8 @@ $('evalInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.pre
 // Hint: rephrase or nudge on the SAME question — never a new one.
 $('evalHintBtn').onclick = async () => {
   const d = state.doc, ch = chunk(), q = d?.questions?.[d.current];
-  if (!d || !ch || !q) return;
+  if (!ch) return toast(t('summary.needDoc'));
+  if (!d || !q) return;
   const btn = $('evalHintBtn'); busy(btn, true, t('eval.thinking'));
   const p = document.createElement('p');
   p.className = 'eval-hint-item';
@@ -458,7 +460,7 @@ function setGenProgress(frac, label) {
 function showGenOverlay(on, errMsg_) {
   genOverlay.hidden = !on;
   genBack.hidden = !errMsg_;
-  if (on) { genBar.hidden = true; genFill.style.width = '0%'; }
+  if (on) { genFill.style.width = '0%'; genBar.hidden = false; }
   if (errMsg_) genHint.textContent = errMsg_;
   else genHint.textContent = t('gen.hint');
 }
@@ -490,6 +492,7 @@ async function launchLearningExperience() {
     ];
     let done = 0;
     const total = steps.length;
+    setGenProgress(0.02, t('gen.step', { done, total }));
     const results = await Promise.allSettled(steps.map(p => Promise.resolve(p)
       .then(v => { done++; setGenProgress(done / total, t('gen.step', { done, total })); return v; },
             e => { done++; setGenProgress(done / total, t('gen.step', { done, total })); throw e; })));

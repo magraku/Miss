@@ -34,7 +34,9 @@ export function save() {
 }
 
 export async function persistDoc() {
-  if (!state.doc) return;
+  // Never write a meta-only doc over the stored body — chunks hydrate async
+  // and a chunk-less write would wipe the course.
+  if (!state.doc || !state.doc.chunks?.length) return;
   await putCourse(state.doc.id, {
     name: state.doc.name, lang: state.doc.lang,
     chunks: state.doc.chunks, summaries: state.doc.summaries,
