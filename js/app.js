@@ -28,7 +28,8 @@ bus.addEventListener('stats', renderStats);
 const VIEWS = ['home', 'library', 'study'];
 function showView(name) {
   VIEWS.forEach(v => { $(`view-${v}`).hidden = v !== name; });
-  $('topTabs').hidden = name !== 'study';
+  const tt = $('topTabs');
+  if (tt) tt.hidden = name !== 'study';
   if (name === 'library') renderLibrary();
   if (name === 'study') { renderDoc(); renderStats(); }
 }
@@ -470,20 +471,24 @@ function initOnboarding() {
 
 /* ── Boot ── */
 async function boot() {
-  applyI18n();
-  renderGreeting();
-  renderStats();
-  renderAuth();
-  initStudy();
-  initTimer();
-  initOnboarding();
-  updateEngineUI();
-  await hydrateDoc();
+  try {
+    applyI18n();
+    renderGreeting();
+    renderStats();
+    renderAuth();
+    initStudy();
+    initTimer();
+    initOnboarding();
+    updateEngineUI();
+  } catch (e) { console.warn('boot ui failed', e); }
+  // Probe the engine FIRST — a failure in storage/auth/onboarding must never
+  // leave the "device can't run the AI" message up.
+  caps = await probeCapabilities().catch(() => caps);
+  void connect();
+  try { await hydrateDoc(); } catch (e) { console.warn('hydrate failed', e); }
   renderDoc();
   showView(state.doc ? 'study' : 'home');
-  await initAuth();
-  caps = await probeCapabilities();
-  void connect();
+  await initAuth().catch(e => console.warn('auth init failed', e));
   if (!state.settings.onboarded) $('onboardDlg').showModal();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 }
