@@ -266,12 +266,13 @@ async function loadDoc(name, chunks) {
 
 function renderDoc() {
   const d = state.doc;
+  const n = d?.chunks?.length || 0; // localStorage keeps the doc meta but not chunks (hydrateDoc fills them later)
   const label = i => {
     const c = d.chunks[i];
     return c.pStart ? (c.pStart === c.pEnd ? t('doc.pages', { p: c.pStart }) : t('doc.pagesRange', { a: c.pStart, b: c.pEnd })) : '';
   };
   const sl = $('sectionLabel');
-  if (sl) sl.textContent = d ? `${d.current + 1} / ${d.chunks.length}${label(d.current) ? ' · ' + label(d.current) : ''}` : t('doc.none');
+  if (sl) sl.textContent = d && n ? `${d.current + 1} / ${n}${label(d.current) ? ' · ' + label(d.current) : ''}` : t('doc.none');
   const prev = $('prevSec'), next = $('nextSec'), nextL = $('nextLesson');
   if (d) {
     prev.disabled = d.current === 0;
@@ -279,18 +280,18 @@ function renderDoc() {
     // judged the learner's answer "mastered" (or a challenge was passed).
     // Without a running engine (mobile review) navigation stays free.
     const canEvaluate = engineState.status === 'ready';
-    const unlocked = !canEvaluate || d.done.includes(d.current);
-    next.disabled = nextL.disabled = d.current >= d.chunks.length - 1 || !unlocked;
+    const unlocked = !canEvaluate || (d.done || []).includes(d.current);
+    next.disabled = nextL.disabled = !n || d.current >= n - 1 || !unlocked;
     nextL.textContent = unlocked ? t('doc.nextLesson') : t('doc.locked');
     nextL.classList.toggle('locked', !unlocked);
   }
   const dn = $('docName');
   if (dn) dn.textContent = d ? d.name : '';
-  if (d) renderSummary();
+  if (d && n) renderSummary();
 }
 
 async function goTo(i) {
-  if (!state.doc) return;
+  if (!state.doc?.chunks?.length) return;
   state.doc.current = Math.max(0, Math.min(state.doc.chunks.length - 1, i));
   notifyDoc();
   await persistDoc();
@@ -304,7 +305,7 @@ bus.addEventListener('lang', renderDoc); // keep the lock label in the right lan
 
 /* ── Lesson (summary) ── */
 function renderSummary() {
-  const s = state.doc && state.doc.summaries[state.doc.current];
+  const s = state.doc && state.doc.summaries?.[state.doc.current];
   const out = $('summaryOut');
   if (out) out.innerHTML = s ? md(s) : `<p class="empty-msg">${t('summary.empty')}</p>`;
 }
@@ -343,7 +344,7 @@ function renderEvalBox() {
   if (!box) return;
   const d = state.doc;
   const key = d ? `${d.id}:${d.current}` : null;
-  const hasLesson = !!(d && d.summaries[d.current]);
+  const hasLesson = !!(d && d.summaries?.[d.current]);
   box.hidden = !(hasLesson && engineState.status === 'ready');
   if (key !== evalFor) { // only reset the conversation when the section changes
     evalFor = key;
@@ -363,7 +364,7 @@ async function evaluateAnswer() {
   try {
     const r = await chatJSON([
       { role: 'system', content: sys(d) },
-      { role: 'user', content: `${EVAL_REQUEST[docLang(d)]}${learner()}\n\nLESSON MATERIAL:\n${ch.text}\n\nLESSON:\n${d.summaries[d.current]}\n\nLEARNER ANSWER:\n${answer}` },
+      { role: 'user', content: `${EVAL_REQUEST[docLang(d)]}${learner()}\n\nLESSON MATERIAL:\n${ch.text}\n\nLESSON:\n${d.summaries?.[d.current] || ''}\n\nLEARNER ANSWER:\n${answer}` },
     ], EVAL_SCHEMA);
     const fb = $('evalFeedback');
     const cls = r.verdict === 'mastered' ? 'eval-good' : r.verdict === 'partial' ? 'eval-mid' : 'eval-bad';
@@ -387,7 +388,7 @@ $('evalInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.pre
 
 // Auto-generate lesson when entering a section that has none.
 async function maybeGenerateForSection() {
-  if (!state.doc || state.doc.summaries[state.doc.current]) return;
+  if (!state.doc || state.doc.summaries?.[state.doc.current]) return;
   if (engineState.status !== 'ready') return;
   await genSummary({ automatic: true });
 }
