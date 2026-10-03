@@ -372,6 +372,12 @@ body[data-phase="break"] .arc { stroke: var(--gold); }
 .gen-title { font-family: var(--font-serif); font-style: italic; font-size: 1.6rem; }
 .gen-hint { color: var(--ink-muted); font-size: 0.85rem; max-width: 40ch; text-align: center; }
 .gen-bar { margin: 0.2rem 0; }
+.gen-bar span {
+  background: linear-gradient(90deg, var(--pink), var(--pink-soft), var(--pink));
+  background-size: 200% 100%;
+  animation: genShimmer 1.6s linear infinite;
+}
+@keyframes genShimmer { to { background-position: -200% 0; } }
 
 /* ═══ Dialogs / toast ═══ */
 dialog {

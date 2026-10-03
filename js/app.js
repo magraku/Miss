@@ -319,7 +319,7 @@ const learner = () => state.settings.name
   : '';
 
 const genSummaryBtn = $('genSummary');
-async function genSummary({ automatic = false } = {}) {
+async function genSummary({ automatic = false, onProgress } = {}) {
   const ch = chunk();
   if (!ch) return toast(t('summary.needDoc'));
   const out = $('summaryOut');
@@ -332,7 +332,7 @@ async function genSummary({ automatic = false } = {}) {
     for await (const t_ of chatStream([
       { role: 'system', content: sys(d) },
       { role: 'user', content: `${FIRST_LESSON_REQUEST[docLang(d)]}${learner()}\n\n${docLang(d) === 'fr' ? 'MATÉRIAU DE LA SECTION' : 'SECTION MATERIAL'}:\n${ch.text}${apiBlock}` },
-    ])) { acc += t_; out.innerHTML = md(acc); }
+    ])) { acc += t_; out.innerHTML = md(acc); onProgress?.(Math.min(1, acc.length / 4000)); }
     if (!acc.trim()) throw new Error(t('err.notJson'));
     state.doc.summaries[idx] = acc;
     // The check question is extracted once and frozen: retries, feedback and
@@ -485,17 +485,20 @@ async function launchLearningExperience() {
       void connect(); // start/resume if idle
       await whenEngineReady();
     }
-    const steps = [
-      genSummary({ automatic: true }),
-      genCards({ automatic: true }),
-      genQuiz({ automatic: true }),
-    ];
-    let done = 0;
-    const total = steps.length;
-    setGenProgress(0.02, t('gen.step', { done, total }));
-    const results = await Promise.allSettled(steps.map(p => Promise.resolve(p)
-      .then(v => { done++; setGenProgress(done / total, t('gen.step', { done, total })); return v; },
-            e => { done++; setGenProgress(done / total, t('gen.step', { done, total })); throw e; })));
+    const names = [t('gen.stepLesson'), t('gen.stepCards'), t('gen.stepQuiz')];
+    const marks = ['…', '…', '…'];
+    const total = names.length;
+    let done = 0, sub = 0; // sub = streaming fraction of the running lesson step
+    const label = () => `${t('gen.step', { done, total })} — ${names.map((n, i) => `${n}${marks[i]}`).join(' · ')}`;
+    const paint = () => setGenProgress((done + Math.min(sub, 0.97)) / total, label());
+    const finish = (i, ok) => { marks[i] = ok ? '✓' : '✗'; done++; if (i === 0) sub = 0; paint(); };
+    const track = (p, i) => Promise.resolve(p).then(v => { finish(i, true); return v; }, e => { finish(i, false); throw e; });
+    paint();
+    const results = await Promise.allSettled([
+      track(genSummary({ automatic: true, onProgress: f => { sub = f; paint(); } }), 0),
+      track(genCards({ automatic: true }), 1),
+      track(genQuiz({ automatic: true }), 2),
+    ]);
     if (launch !== learningLaunch) return;
     showGenOverlay(false);
     if (results.some(r => r.status === 'fulfilled')) toast(t('toast.ready'));
