@@ -207,7 +207,7 @@
     <input id="authEmail" type="email" required data-i18n-ph="auth.email" placeholder="you@example.com">
     <div class="reflect-controls">
       <button class="pill-btn" id="authSend" value="send" data-i18n="auth.send">send magic link</button>
-      <button class="ghost-link" value="cancel" formnovalidate>cancel</button>
+      <button type="button" class="ghost-link" onclick="this.closest('dialog').close()" data-i18n="auth.cancel">cancel</button>
     </div>
     <p id="authMsg" class="status-msg"></p>
   </form>

@@ -1,5 +1,5 @@
 // MissPedia — main controller. Views: home / library / study (Data Deck).
-import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse } from './store.js';
+import { state, save, bus, notifyDoc, persistDoc, hydrateDoc, upsertLibrary, removeCourse, addXP } from './store.js';
 import { connect, chatStream, engineState, onEngineChange, probeCapabilities, whenEngineReady } from './llm.js';
 import { extractPdf, chunkPages, chunkPlain, detectLang } from './docs.js';
 import { $, esc, md, toast, busy, errMsg, fmtDate } from './util.js';
@@ -90,7 +90,7 @@ document.querySelectorAll('.topbar .lang-toggle button').forEach(b => {
   };
 });
 $('navDonate').href = CONFIG.DONATE_URL || '#';
-$('navDonate').onclick = e => { if (!CONFIG.DONATE_URL) { e.preventDefault(); toast('Donation link coming soon — thank you!'); } };
+$('navDonate').onclick = e => { if (!CONFIG.DONATE_URL) { e.preventDefault(); toast(t('nav.donateToast')); } };
 $('brandHome').onclick = e => { e.preventDefault(); showView('home'); };
 $('navLibrary').onclick = () => showView('library');
 
@@ -208,6 +208,10 @@ async function handleFile(file) {
   dropHint.textContent = file.name;
   $('docStatus').textContent = '';
   try {
+    // Only pdf/txt/md — the accept attribute is a hint, not a validation.
+    const okType = /\.(pdf|txt|md|markdown)$/i.test(file.name) ||
+      file.type === 'application/pdf' || file.type.startsWith('text/');
+    if (!okType) throw new Error(t('home.badType'));
     let chunks;
     if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
       const pages = await extractPdf(file, (p, n) => { dropLabel.textContent = t('home.page', { p, n }); });
@@ -215,6 +219,9 @@ async function handleFile(file) {
     } else {
       chunks = chunkPlain(await file.text());
     }
+    // Same minimum as pasted text: refuse empty / unusable documents.
+    if (!chunks.length || chunks.map(c => c.text).join('').trim().length < 50)
+      throw new Error(t('home.docTooShort'));
     await loadDoc(file.name, chunks);
     dropRing.classList.add('has-file');
     dropLabel.textContent = file.name.length > 28 ? file.name.slice(0, 25) + '…' : file.name;
@@ -291,7 +298,7 @@ function renderDoc() {
   }
   const dn = $('docName');
   if (dn) dn.textContent = d ? d.name : '';
-  if (d && n) renderSummary();
+  if (d) renderSummary(); // always refresh — clears a stale lesson when the doc has no content
 }
 
 async function goTo(i) {
@@ -501,7 +508,11 @@ async function launchLearningExperience() {
     ]);
     if (launch !== learningLaunch) return;
     showGenOverlay(false);
-    if (results.some(r => r.status === 'fulfilled')) toast(t('toast.ready'));
+    // Generators toast their own errors and resolve with a falsy value —
+    // count real output, not just settled promises.
+    const ok = results.filter(r => r.status === 'fulfilled' && r.value).length;
+    if (ok === total) toast(t('toast.ready'));
+    else if (ok) toast(t('toast.partial', { n: ok, total }));
     else toast(t('err.ollama'));
   } catch (e) {
     if (launch !== learningLaunch) return;

@@ -24,7 +24,8 @@ analogy or simpler activity, then ask again. Never reveal an answer before the
 learner has tried.
 
 Tone: clear, conversational, patient, motivating, demanding. Reply entirely in
-English.
+English. Write formulas and scientific notation in plain text with Unicode
+(CO₂, H₂O, x², 10⁻³) — never LaTeX, never $…$.
 
 EVALUATION LOOP (critical): after teaching a concept, check comprehension
 before allowing progress. Analyse the learner's answer by meaning, not literal
@@ -61,7 +62,8 @@ analogie ou une activité plus simple, puis repose la question. Ne révèle
 jamais une réponse avant que l'apprenant ait essayé.
 
 Ton : clair, conversationnel, patient, motivant et exigeant. Réponds
-entièrement en français.
+entièrement en français. Écris les formules et notations en texte simple avec
+Unicode (CO₂, H₂O, x², 10⁻³) — jamais de LaTeX, jamais de $…$.
 
 BOUCLE D'ÉVALUATION (critique) : après chaque concept, vérifie la compréhension
 avant de laisser avancer. Analyse la réponse sur le sens, pas la forme. Si
@@ -108,6 +110,7 @@ cards: each card is ONE key concept. Fields: "title" (2-4 word card name),
 from the card alone), "img" (a 5-10 word English visual prompt that illustrates
 THIS card's specific concept: name the concrete objects, scene or diagram that
 represent it — never a generic study image, no text in image).
+Reply as JSON: {"cards": [{"title", "front", "back", "img"}, ...]}
 
 TEXT:
 `,
@@ -119,6 +122,7 @@ clés — assez pour apprendre avec la carte seule), "img" (prompt visuel en
 anglais de 5-10 mots qui illustre le concept précis de CETTE carte : nomme les
 objets, la scène ou le schéma qui le représentent — jamais d'image générique,
 pas de texte dans l'image).
+Réponds en JSON : {"cards": [{"title", "front", "back", "img"}, ...]}
 
 TEXTE :
 `,
@@ -129,6 +133,7 @@ en: `Create a 5-question multiple-choice quiz (4 options each) about this text.
 Order from easiest to hardest: first recognising concepts, last applying them
 to a new situation. "answer" is the index (starting at 0) of the correct option
 and "explanation" says why it's correct in one or two sentences.
+Reply as JSON: {"questions": [{"question", "options", "answer", "explanation"}, ...]}
 
 TEXT:
 `,
@@ -137,6 +142,7 @@ texte. Ordonne-les de la plus facile à la plus difficile : d'abord reconnaître
 les concepts, à la fin les appliquer à une situation nouvelle. "answer" est
 l'index (en partant de 0) de la bonne option et "explanation" explique pourquoi
 en une ou deux phrases.
+Réponds en JSON : {"questions": [{"question", "options", "answer", "explanation"}, ...]}
 
 TEXTE :
 `,

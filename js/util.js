@@ -27,10 +27,32 @@ export function errMsg(e) {
 }
 
 // Minimal safe markdown: bold, italics, code, lists, headings. Input is escaped first.
+// Also flattens simple $…$ math into Unicode (CO₂, x², a⁄b) — lessons must be
+// readable even when the model ignores the "no LaTeX" instruction.
+const TEX_CMD = {
+  times:'×', div:'÷', pm:'±', cdot:'·', approx:'≈', neq:'≠', leq:'≤', geq:'≥',
+  alpha:'α', beta:'β', gamma:'γ', delta:'δ', Delta:'Δ', pi:'π', lambda:'λ',
+  mu:'μ', sigma:'σ', rightarrow:'→', to:'→', infty:'∞', deg:'°',
+};
+const SUB = { '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','(':'₍',')':'₎','=':'₌' };
+const SUP = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ' };
+const toScript = (t, map) => [...t].map(c => map[c] ?? c).join('');
+function texify(s) {
+  return s
+    .replace(/\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (_, a, b) => `${a}⁄${b}`)
+    .replace(/\\([a-zA-Z]+)/g, (m, name) => TEX_CMD[name] ?? name)
+    .replace(/([_^])\{([^{}]*)\}|([_^])(.)/g, (m, symG, g, sym, single, off) => {
+      const sup = (symG || sym) === '^';
+      return toScript(g ?? single, sup ? SUP : SUB);
+    })
+    .replace(/[{}]/g, '');
+}
 export function md(text) {
   const lines = esc(text).split('\n');
   let html = '', list = null;
   const inline = s => s
+    .replace(/\\\(([^)]*?)\\\)|\\\[([\s\S]*?)\\\]/g, (m, a, b) => texify(a ?? b))
+    .replace(/\$([^$]+)\$/g, (m, inner) => texify(inner))
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1<em>$2</em>')
     .replace(/`(.+?)`/g, '<code>$1</code>');

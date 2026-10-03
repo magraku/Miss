@@ -235,7 +235,11 @@ async function cloudFetch(messages, json = false) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, json }),
   });
-  if (!res.ok) throw new Error(`cloud ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try { const j = await res.json(); detail = j.detail || j.error || ''; } catch { /* non-json */ }
+    throw new Error(`cloud ${res.status}${detail ? ` — ${String(detail).slice(0, 140)}` : ''}`);
+  }
   return res;
 }
 

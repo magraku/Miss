@@ -47,6 +47,11 @@ module.exports = async function handler(req, res) {
     .filter(m => m && typeof m.content === 'string')
     .map(m => ({ role: ['system', 'user', 'assistant'].includes(m.role) ? m.role : 'user', content: m.content }));
 
+  // Groq's json_object mode rejects the request unless a message mentions
+  // JSON — inject a reminder when the caller forgot.
+  if (body.json && !messages.some(m => /json/i.test(m.content)))
+    messages.push({ role: 'system', content: 'Reply only with valid JSON.' });
+
   try {
     let up = null, txt = '';
     for (const model of MODELS) {
